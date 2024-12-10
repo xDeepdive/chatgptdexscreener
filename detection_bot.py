@@ -1,7 +1,7 @@
 import requests
 
 # Trading bot webhook URL
-TRADING_BOT_WEBHOOK = "http://localhost:5000/trade"
+TRADING_BOT_WEBHOOK = "https://trading-bot-v0nx.onrender.com/trade"
 
 def fetch_tokens():
     """
