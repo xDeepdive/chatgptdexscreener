@@ -2,6 +2,7 @@ import requests
 from flask import Flask, request
 from datetime import datetime
 import os
+import threading
 
 try:
     import telegram
@@ -11,7 +12,7 @@ except ModuleNotFoundError:
 # Environment Variables
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8116367888:AAEd5fYDGqrI-QjvOfw95tc_N9IJjnoo89o")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "5067817541")
-TRADING_BOT_WEBHOOK = os.getenv("TRADING_BOT_WEBHOOK", "https://trading-bot-v0nx.onrender.com")
+TRADING_BOT_WEBHOOK = os.getenv("TRADING_BOT_WEBHOOK", "https://trading-bot-v0nx.onrender.com/trade")
 
 # Initialize Flask App
 app = Flask(__name__)
@@ -39,6 +40,7 @@ def webhook():
         print(f"Error handling webhook: {e}")
         return "Error", 500
 
+
 def send_telegram_notification(message, chat_id=TELEGRAM_CHAT_ID):
     """
     Send a message to the configured Telegram chat.
@@ -50,14 +52,15 @@ def send_telegram_notification(message, chat_id=TELEGRAM_CHAT_ID):
     except Exception as e:
         print(f"Error sending Telegram notification: {e}")
 
+
 def fetch_tokens():
     """
     Fetch token profiles from the Dexscreener API endpoint.
     """
     url = "https://api.dexscreener.com/token-profiles/latest/v1"
     try:
-        response = requests.get(url)
         print(f"Fetching tokens from {url}...")
+        response = requests.get(url, timeout=10)
         if response.status_code == 200:
             print("Tokens fetched successfully!")
             send_telegram_notification("✅ Tokens fetched successfully from Dexscreener!")
@@ -72,6 +75,7 @@ def fetch_tokens():
         print(error_message)
         send_telegram_notification(f"❌ {error_message}")
         return []
+
 
 def filter_tokens(tokens):
     """
@@ -99,6 +103,7 @@ def filter_tokens(tokens):
         send_telegram_notification("⚠️ No tokens qualified based on the criteria.")
     return qualified_tokens
 
+
 def send_to_trading_bot(contract_address, token_symbol):
     """
     Send qualified tokens to the trading bot.
@@ -106,7 +111,7 @@ def send_to_trading_bot(contract_address, token_symbol):
     payload = {"contract_address": contract_address, "symbol": token_symbol}
     try:
         print(f"Attempting to send to trading bot: {payload}")
-        response = requests.post(TRADING_BOT_WEBHOOK, json=payload)
+        response = requests.post(TRADING_BOT_WEBHOOK, json=payload, timeout=10)
         if response.status_code == 200:
             success_message = f"✅ Successfully sent {token_symbol} ({contract_address}) to trading bot!"
             print(success_message)
@@ -120,20 +125,26 @@ def send_to_trading_bot(contract_address, token_symbol):
         print(error_message)
         send_telegram_notification(error_message)
 
-def main():
-    """
-    Main function to fetch, filter, and send tokens to the trading bot.
-    """
-    send_telegram_notification("🚀 Detection bot is now live and monitoring tokens!")
-    tokens = fetch_tokens()
-    if not tokens:
-        print("No tokens fetched. Exiting...")
-        return
 
-    qualified_tokens = filter_tokens(tokens)
-    for token in qualified_tokens:
-        send_to_trading_bot(token["contract_address"], token["symbol"])
+def start_fetching_tokens():
+    """
+    Continuously fetch and process tokens in a background thread.
+    """
+    while True:
+        try:
+            tokens = fetch_tokens()
+            if tokens:
+                qualified_tokens = filter_tokens(tokens)
+                for token in qualified_tokens:
+                    send_to_trading_bot(token["contract_address"], token["symbol"])
+        except Exception as e:
+            print(f"Error in token fetching loop: {e}")
+        finally:
+            time.sleep(300)  # Fetch every 5 minutes
+
 
 if __name__ == "__main__":
+    # Run Flask app and token fetching in separate threads
+    threading.Thread(target=start_fetching_tokens).start()
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
