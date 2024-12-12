@@ -11,7 +11,7 @@ except ModuleNotFoundError:
 # Environment Variables
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8116367888:AAEd5fYDGqrI-QjvOfw95tc_N9IJjnoo89o")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "5067817541")
-TRADING_BOT_WEBHOOK = os.getenv("TRADING_BOT_WEBHOOK", "https://trading-bot-v0nx.onrender.com/trade")
+TRADING_BOT_WEBHOOK = os.getenv("TRADING_BOT_WEBHOOK", "https://trading-bot-v0nx.onrender.com")
 
 # Initialize Flask App
 app = Flask(__name__)
@@ -22,7 +22,7 @@ def webhook():
     Handle incoming webhook messages from Telegram.
     """
     if request.method == "HEAD":
-        return "", 200  # Respond with a simple 200 OK for HEAD requests
+        return "", 200
 
     try:
         update = telegram.Update.de_json(request.get_json(force=True), telegram.Bot(token=TELEGRAM_BOT_TOKEN))
@@ -52,7 +52,7 @@ def send_telegram_notification(message, chat_id=TELEGRAM_CHAT_ID):
 
 def fetch_tokens():
     """
-    Fetch token profiles from the updated Dexscreener API endpoint.
+    Fetch token profiles from the Dexscreener API endpoint.
     """
     url = "https://api.dexscreener.com/token-profiles/latest/v1"
     try:
@@ -61,7 +61,7 @@ def fetch_tokens():
         if response.status_code == 200:
             print("Tokens fetched successfully!")
             send_telegram_notification("✅ Tokens fetched successfully from Dexscreener!")
-            return response.json()  # Assuming it's a list
+            return response.json()
         else:
             error_message = f"Error fetching tokens: {response.status_code} - {response.text}"
             print(error_message)
@@ -75,7 +75,7 @@ def fetch_tokens():
 
 def filter_tokens(tokens):
     """
-    Filter tokens based on available fields in the API response.
+    Filter tokens based on specific criteria.
     """
     qualified_tokens = []
     for token in tokens:
@@ -101,7 +101,7 @@ def filter_tokens(tokens):
 
 def send_to_trading_bot(contract_address, token_symbol):
     """
-    Send the qualified token data to the trading bot.
+    Send qualified tokens to the trading bot.
     """
     payload = {"contract_address": contract_address, "symbol": token_symbol}
     try:
