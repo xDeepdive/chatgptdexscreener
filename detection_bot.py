@@ -35,13 +35,17 @@ def webhook():
 
     try:
         update = telegram.Update.de_json(request.get_json(force=True), telegram.Bot(token=TELEGRAM_BOT_TOKEN))
-        chat_id = update.message.chat.id
-        message_text = update.message.text
+        
+        if update.message:  # Check if 'message' exists
+            chat_id = update.message.chat.id
+            message_text = update.message.text
 
-        if message_text == "/start":
-            send_telegram_notification("Hello! Detection bot is up and running.", chat_id)
+            if message_text == "/start":
+                send_telegram_notification("Hello! Detection bot is up and running.", chat_id)
+            else:
+                send_telegram_notification(f"You said: {message_text}", chat_id)
         else:
-            send_telegram_notification(f"You said: {message_text}", chat_id)
+            logging.warning(f"Received update without a message: {update}")
 
         return "OK"
     except Exception as e:
