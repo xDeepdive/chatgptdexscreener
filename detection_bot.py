@@ -46,12 +46,15 @@ def webhook():
 
 def send_telegram_notification(message, chat_id=TELEGRAM_CHAT_ID):
     """
-    Send a message to the configured Telegram chat.
+    Send a message to the configured Telegram chat with an increased timeout.
     """
     try:
         bot = telegram.Bot(token=TELEGRAM_BOT_TOKEN)
-        bot.send_message(chat_id=chat_id, text=message)
+        # Adding timeout parameter
+        bot.send_message(chat_id=chat_id, text=message, timeout=30)
         print(f"Telegram notification sent: {message}")
+    except telegram.error.TelegramError as e:
+        print(f"Telegram API Error: {e}")
     except Exception as e:
         print(f"Error sending Telegram notification: {e}")
 
