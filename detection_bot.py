@@ -16,11 +16,14 @@ TRADING_BOT_WEBHOOK = os.getenv("TRADING_BOT_WEBHOOK", "https://trading-bot-v0nx
 # Initialize Flask App
 app = Flask(__name__)
 
-@app.route("/", methods=["POST"])
+@app.route("/", methods=["POST", "HEAD"])
 def webhook():
     """
     Handle incoming webhook messages from Telegram.
     """
+    if request.method == "HEAD":
+        return "", 200  # Respond with a simple 200 OK for HEAD requests
+
     try:
         update = telegram.Update.de_json(request.get_json(force=True), telegram.Bot(token=TELEGRAM_BOT_TOKEN))
         chat_id = update.message.chat.id
