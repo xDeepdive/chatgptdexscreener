@@ -4,6 +4,7 @@ from datetime import datetime
 import os
 import time  # For time.sleep functionality
 from threading import Thread
+import logging
 
 try:
     import telegram
@@ -17,6 +18,9 @@ TRADING_BOT_WEBHOOK = os.getenv("TRADING_BOT_WEBHOOK", "https://trading-bot-v0nx
 
 # Initialize Flask App
 app = Flask(__name__)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 @app.route("/", methods=["POST", "HEAD", "GET"])
 def webhook():
@@ -41,7 +45,7 @@ def webhook():
 
         return "OK"
     except Exception as e:
-        print(f"Error handling webhook: {e}")
+        logging.error(f"Error handling webhook: {e}")
         return "Error", 500
 
 def send_telegram_notification(message, chat_id=TELEGRAM_CHAT_ID):
@@ -50,13 +54,12 @@ def send_telegram_notification(message, chat_id=TELEGRAM_CHAT_ID):
     """
     try:
         bot = telegram.Bot(token=TELEGRAM_BOT_TOKEN)
-        # Adding timeout parameter
         bot.send_message(chat_id=chat_id, text=message, timeout=30)
-        print(f"Telegram notification sent: {message}")
+        logging.info(f"Telegram notification sent: {message}")
     except telegram.error.TelegramError as e:
-        print(f"Telegram API Error: {e}")
+        logging.error(f"Telegram API Error: {e}")
     except Exception as e:
-        print(f"Error sending Telegram notification: {e}")
+        logging.error(f"Error sending Telegram notification: {e}")
 
 def fetch_tokens():
     """
@@ -65,19 +68,19 @@ def fetch_tokens():
     url = "https://api.dexscreener.com/token-profiles/latest/v1"
     try:
         response = requests.get(url)
-        print(f"Fetching tokens from {url}...")
+        logging.info(f"Fetching tokens from {url}...")
         if response.status_code == 200:
-            print("Tokens fetched successfully!")
+            logging.info("Tokens fetched successfully!")
             send_telegram_notification("✅ Tokens fetched successfully from Dexscreener!")
             return response.json()
         else:
             error_message = f"Error fetching tokens: {response.status_code} - {response.text}"
-            print(error_message)
+            logging.error(error_message)
             send_telegram_notification(f"❌ {error_message}")
             return []
     except Exception as e:
         error_message = f"Error during fetch: {e}"
-        print(error_message)
+        logging.error(error_message)
         send_telegram_notification(f"❌ {error_message}")
         return []
 
@@ -94,16 +97,16 @@ def filter_tokens(tokens):
             has_twitter = any(link.get("type") == "twitter" for link in token.get("links", []))
 
             if chain_id == "solana" and description and has_twitter:
-                print(f"Token qualified: {description} (Address: {token_address})")
+                logging.info(f"Token qualified: {description} (Address: {token_address})")
                 qualified_tokens.append({
                     "contract_address": token_address,
                     "symbol": description
                 })
         except KeyError as e:
-            print(f"Missing key in token data: {e}")
+            logging.error(f"Missing key in token data: {e}")
 
     if not qualified_tokens:
-        print("No tokens qualified based on the criteria.")
+        logging.warning("No tokens qualified based on the criteria.")
         send_telegram_notification("⚠️ No tokens qualified based on the criteria.")
     return qualified_tokens
 
@@ -113,19 +116,19 @@ def send_to_trading_bot(contract_address, token_symbol):
     """
     payload = {"contract_address": contract_address, "symbol": token_symbol}
     try:
-        print(f"Attempting to send to trading bot: {payload}")
+        logging.info(f"Attempting to send to trading bot: {payload}")
         response = requests.post(TRADING_BOT_WEBHOOK, json=payload)
         if response.status_code == 200:
             success_message = f"✅ Successfully sent {token_symbol} ({contract_address}) to trading bot!"
-            print(success_message)
+            logging.info(success_message)
             send_telegram_notification(success_message)
         else:
             error_message = f"❌ Failed to send {token_symbol}. Response: {response.status_code} - {response.text}"
-            print(error_message)
+            logging.error(error_message)
             send_telegram_notification(error_message)
     except Exception as e:
         error_message = f"❌ Error sending {token_symbol} to trading bot: {e}"
-        print(error_message)
+        logging.error(error_message)
         send_telegram_notification(error_message)
 
 def start_fetching_tokens():
@@ -138,7 +141,7 @@ def start_fetching_tokens():
             qualified_tokens = filter_tokens(tokens)
             for token in qualified_tokens:
                 send_to_trading_bot(token["contract_address"], token["symbol"])
-        time.sleep(300)  # Wait for 5 minutes before fetching tokens again
+        time.sleep(120)  # Wait for 2 minutes before fetching tokens again
 
 if __name__ == "__main__":
     # Start token fetching in a separate thread
