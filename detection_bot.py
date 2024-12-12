@@ -11,7 +11,7 @@ except ModuleNotFoundError:
     raise ImportError("The 'telegram' module is not installed. Install it using 'pip install python-telegram-bot'.")
 
 # Environment Variables
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8116367888:AAEd5fYDGqrI-QjvOfw95tc_N9IJjnoo89o")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7617319742:AAHoKC5gxDKI5aOaEekS4bgiSfde4gKh0EI")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "5067817541")
 TRADING_BOT_WEBHOOK = os.getenv("TRADING_BOT_WEBHOOK", "https://trading-bot-v0nx.onrender.com/trade")
 
