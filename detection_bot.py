@@ -1,29 +1,51 @@
 import requests
+from flask import Flask, request
 from datetime import datetime
+import os
 
 try:
     import telegram
 except ModuleNotFoundError:
     raise ImportError("The 'telegram' module is not installed. Install it using 'pip install python-telegram-bot'.")
 
-# Telegram Bot Token and Chat ID
-TELEGRAM_BOT_TOKEN = "8116367888:AAEd5fYDGqrI-QjvOfw95tc_N9IJjnoo89o"
-TELEGRAM_CHAT_ID = "5067817541"  # Replace with your chat ID
+# Environment Variables
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8116367888:AAEd5fYDGqrI-QjvOfw95tc_N9IJjnoo89o")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "5067817541")
+TRADING_BOT_WEBHOOK = os.getenv("TRADING_BOT_WEBHOOK", "https://trading-bot-v0nx.onrender.com/trade")
 
-TRADING_BOT_WEBHOOK = "https://trading-bot-v0nx.onrender.com/trade"
+# Initialize Flask App
+app = Flask(__name__)
 
+@app.route("/", methods=["POST"])
+def webhook():
+    """
+    Handle incoming webhook messages from Telegram.
+    """
+    try:
+        update = telegram.Update.de_json(request.get_json(force=True), telegram.Bot(token=TELEGRAM_BOT_TOKEN))
+        chat_id = update.message.chat.id
+        message_text = update.message.text
 
-def send_telegram_notification(message):
+        if message_text == "/start":
+            send_telegram_notification("Hello! Detection bot is up and running.", chat_id)
+        else:
+            send_telegram_notification(f"You said: {message_text}", chat_id)
+
+        return "OK"
+    except Exception as e:
+        print(f"Error handling webhook: {e}")
+        return "Error", 500
+
+def send_telegram_notification(message, chat_id=TELEGRAM_CHAT_ID):
     """
     Send a message to the configured Telegram chat.
     """
     try:
         bot = telegram.Bot(token=TELEGRAM_BOT_TOKEN)
-        bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
+        bot.send_message(chat_id=chat_id, text=message)
         print(f"Telegram notification sent: {message}")
     except Exception as e:
         print(f"Error sending Telegram notification: {e}")
-
 
 def fetch_tokens():
     """
@@ -47,7 +69,6 @@ def fetch_tokens():
         print(error_message)
         send_telegram_notification(f"❌ {error_message}")
         return []
-
 
 def filter_tokens(tokens):
     """
@@ -75,7 +96,6 @@ def filter_tokens(tokens):
         send_telegram_notification("⚠️ No tokens qualified based on the criteria.")
     return qualified_tokens
 
-
 def send_to_trading_bot(contract_address, token_symbol):
     """
     Send the qualified token data to the trading bot.
@@ -97,7 +117,6 @@ def send_to_trading_bot(contract_address, token_symbol):
         print(error_message)
         send_telegram_notification(error_message)
 
-
 def main():
     """
     Main function to fetch, filter, and send tokens to the trading bot.
@@ -112,6 +131,6 @@ def main():
     for token in qualified_tokens:
         send_to_trading_bot(token["contract_address"], token["symbol"])
 
-
 if __name__ == "__main__":
-    main()
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
