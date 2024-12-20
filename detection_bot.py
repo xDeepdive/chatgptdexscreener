@@ -4,7 +4,7 @@ import logging
 from threading import Thread
 
 # Environment Variables
-TRADING_BOT_WEBHOOK = "https://trading-bot-v0nx.onrender.com"  # Replace with the trading bot URL
+TRADING_BOT_WEBHOOK = "https://trading-bot-v0nx.onrender.com/trade"  # Replace with the trading bot URL
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd"  # Replace with your Discord Webhook URL
 
 # Configure logging
