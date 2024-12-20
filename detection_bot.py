@@ -65,8 +65,8 @@ def filter_tokens(tokens):
             # Advanced filters
             if (
                 chain_id == "solana" and
-                volume_24h >= 3_000_000 and
-                days_old >= 3 and
+                volume_24h >= 1_000_000 and
+                days_old >= 1 and
                 holders <= 100_000 and
                 has_social_links
             ):
