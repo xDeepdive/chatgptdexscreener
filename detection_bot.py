@@ -7,8 +7,12 @@ from threading import Thread
 TRADING_BOT_WEBHOOK = "https://trading-bot-v0nx.onrender.com/trade"  # Replace with the trading bot URL
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd"  # Replace with your Discord Webhook URL
 
+# RugCheck API URL
+RUGCHECK_BASE_URL = "https://api.rugcheck.xyz/v1"
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
 
 def send_discord_notification(message):
     """
@@ -23,9 +27,27 @@ def send_discord_notification(message):
     except Exception as e:
         logging.error(f"Error sending Discord notification: {e}")
 
+
+def fetch_rugcheck_report(token_address):
+    """
+    Fetch the RugCheck report for a given token mint address.
+    """
+    try:
+        url = f"{RUGCHECK_BASE_URL}/tokens/{token_address}/report/summary"
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logging.error(f"Failed to fetch RugCheck report: {response.status_code} - {response.text}")
+            return None
+    except Exception as e:
+        logging.error(f"Error fetching RugCheck report: {e}")
+        return None
+
+
 def fetch_tokens():
     """
-    Fetch token profiles from the Dexscreener API endpoint.
+    Fetch token profiles from the DexScreener API endpoint.
     """
     url = "https://api.dexscreener.com/token-profiles/latest/v1"
     try:
@@ -33,7 +55,7 @@ def fetch_tokens():
         logging.info(f"Fetching tokens from {url}...")
         if response.status_code == 200:
             logging.info("Tokens fetched successfully!")
-            send_discord_notification("✅ Tokens fetched successfully from Dexscreener!")
+            send_discord_notification("✅ Tokens fetched successfully from DexScreener!")
             return response.json()
         else:
             error_message = f"Error fetching tokens: {response.status_code} - {response.text}"
@@ -45,6 +67,7 @@ def fetch_tokens():
         logging.error(error_message)
         send_discord_notification(f"❌ {error_message}")
         return []
+
 
 def filter_tokens(tokens):
     """
@@ -62,7 +85,13 @@ def filter_tokens(tokens):
             links = token.get("links", [])
             has_social_links = any(link.get("type") in ["twitter", "telegram", "discord"] for link in links)
 
-            # Advanced filters
+            # Fetch RugCheck report
+            rugcheck_report = fetch_rugcheck_report(token_address)
+            if rugcheck_report and rugcheck_report.get("status") == "fail":
+                logging.warning(f"Token failed RugCheck: {description} (Address: {token_address})")
+                continue
+
+            # Apply advanced filters
             if (
                 chain_id == "solana" and
                 volume_24h >= 1_000_000 and
@@ -82,6 +111,7 @@ def filter_tokens(tokens):
         logging.warning("No tokens qualified based on the criteria.")
         send_discord_notification("⚠️ No tokens qualified based on the criteria.")
     return qualified_tokens
+
 
 def send_to_trading_bot(contract_address, token_symbol):
     """
@@ -104,6 +134,7 @@ def send_to_trading_bot(contract_address, token_symbol):
         logging.error(error_message)
         send_discord_notification(error_message)
 
+
 def start_fetching_tokens():
     """
     Start fetching tokens in a continuous loop.
@@ -115,6 +146,7 @@ def start_fetching_tokens():
             for token in qualified_tokens:
                 send_to_trading_bot(token["contract_address"], token["symbol"])
         time.sleep(120)  # Wait for 2 minutes before fetching tokens again
+
 
 if __name__ == "__main__":
     # Start the token-fetching loop
