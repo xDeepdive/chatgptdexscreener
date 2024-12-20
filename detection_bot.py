@@ -2,31 +2,26 @@ import requests
 import time
 import logging
 from threading import Thread
+import base58
 
 # Environment Variables
 TRADING_BOT_WEBHOOK = "https://trading-bot-v0nx.onrender.com/trade"  # Replace with the trading bot URL
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd"  # Replace with your Discord Webhook URL
-
-# RugCheck API URL
 RUGCHECK_BASE_URL = "https://api.rugcheck.xyz/v1"
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-if not is_valid_base58(token_mint):
-    logging.error(f"Invalid Base58 token mint: {token_mint}")
-    continue  # Skip invalid token mints
-
-
-import base58
 
 def is_valid_base58(token_mint):
+    """
+    Check if a token mint is a valid Base58 string.
+    """
     try:
         base58.b58decode(token_mint)
         return True
     except Exception:
         return False
-
 
 
 def send_discord_notification(message):
@@ -48,6 +43,10 @@ def fetch_rugcheck_report(token_address):
     Fetch the RugCheck report for a given token mint address.
     """
     try:
+        if not is_valid_base58(token_address):
+            logging.error(f"Invalid Base58 token mint: {token_address}")
+            return None
+
         url = f"{RUGCHECK_BASE_URL}/tokens/{token_address}/report/summary"
         response = requests.get(url)
         if response.status_code == 200:
