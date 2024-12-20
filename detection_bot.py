@@ -56,9 +56,20 @@ def filter_tokens(tokens):
             chain_id = token.get("chainId", "")
             description = token.get("description", "")
             token_address = token.get("tokenAddress", "")
-            has_twitter = any(link.get("type") == "twitter" for link in token.get("links", []))
+            volume_24h = token.get("volume24h", 0)
+            days_old = token.get("daysOld", 0)
+            holders = token.get("holders", 0)
+            links = token.get("links", [])
+            has_social_links = any(link.get("type") in ["twitter", "telegram", "discord"] for link in links)
 
-            if chain_id == "solana" and description and has_twitter:
+            # Advanced filters
+            if (
+                chain_id == "solana" and
+                volume_24h >= 3_000_000 and
+                days_old >= 3 and
+                holders <= 100_000 and
+                has_social_links
+            ):
                 logging.info(f"Token qualified: {description} (Address: {token_address})")
                 qualified_tokens.append({
                     "contract_address": token_address,
