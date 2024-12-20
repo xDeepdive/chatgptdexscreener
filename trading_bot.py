@@ -1,7 +1,12 @@
 from flask import Flask, request, jsonify
+import logging
 import os
 
+# Flask App Initialization
 app = Flask(__name__)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 @app.route("/", methods=["GET"])
 def health_check():
@@ -30,14 +35,13 @@ def trade_handler():
             }), 400
 
         # Log the received trade data
-        print(f"Received trade data: {symbol} ({contract_address})")
+        logging.info(f"Received trade data: {symbol} ({contract_address})")
 
-        # Simulate processing the trade data (Add your logic here if necessary)
-        # Example: Forwarding data to another service or saving in a database
+        # Process trade data here if necessary
 
         return jsonify({"status": "success", "message": "Trade data received."}), 200
     except Exception as e:
-        print(f"Error processing trade data: {e}")
+        logging.error(f"Error processing trade data: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == "__main__":
