@@ -13,6 +13,21 @@ RUGCHECK_BASE_URL = "https://api.rugcheck.xyz/v1"
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
+if not is_valid_base58(token_mint):
+    logging.error(f"Invalid Base58 token mint: {token_mint}")
+    continue  # Skip invalid token mints
+
+
+import base58
+
+def is_valid_base58(token_mint):
+    try:
+        base58.b58decode(token_mint)
+        return True
+    except Exception:
+        return False
+
+
 
 def send_discord_notification(message):
     """
