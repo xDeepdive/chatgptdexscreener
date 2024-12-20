@@ -1,19 +1,6 @@
 from flask import Flask, request, jsonify
-import logging
-import os
 
-# Flask App Initialization
 app = Flask(__name__)
-
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
-@app.route("/", methods=["GET"])
-def health_check():
-    """
-    Health check endpoint to verify the trading bot service is running.
-    """
-    return jsonify({"status": "success", "message": "Trading bot is live!"}), 200
 
 @app.route("/trade", methods=["POST"])
 def trade_handler():
@@ -35,15 +22,13 @@ def trade_handler():
             }), 400
 
         # Log the received trade data
-        logging.info(f"Received trade data: {symbol} ({contract_address})")
+        print(f"Received trade data: {symbol} ({contract_address})")
 
-        # Process trade data here if necessary
-
+        # Simulate processing the trade data (e.g., saving it or further processing)
         return jsonify({"status": "success", "message": "Trade data received."}), 200
     except Exception as e:
-        logging.error(f"Error processing trade data: {e}")
+        print(f"Error processing trade data: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=10000)
