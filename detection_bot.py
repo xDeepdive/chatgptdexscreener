@@ -7,22 +7,22 @@ import base58
 # Environment Variables
 TRADING_BOT_WEBHOOK = "https://trading-bot-v0nx.onrender.com/trade"  # Replace with the trading bot URL
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd"  # Replace with your Discord Webhook URL
+
+# RugCheck API URL
 RUGCHECK_BASE_URL = "https://api.rugcheck.xyz/v1"
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-
 def is_valid_base58(token_mint):
     """
-    Check if a token mint is a valid Base58 string.
+    Validate if a token mint address is valid Base58.
     """
     try:
         base58.b58decode(token_mint)
         return True
     except Exception:
         return False
-
 
 def send_discord_notification(message):
     """
@@ -37,16 +37,11 @@ def send_discord_notification(message):
     except Exception as e:
         logging.error(f"Error sending Discord notification: {e}")
 
-
 def fetch_rugcheck_report(token_address):
     """
     Fetch the RugCheck report for a given token mint address.
     """
     try:
-        if not is_valid_base58(token_address):
-            logging.error(f"Invalid Base58 token mint: {token_address}")
-            return None
-
         url = f"{RUGCHECK_BASE_URL}/tokens/{token_address}/report/summary"
         response = requests.get(url)
         if response.status_code == 200:
@@ -57,7 +52,6 @@ def fetch_rugcheck_report(token_address):
     except Exception as e:
         logging.error(f"Error fetching RugCheck report: {e}")
         return None
-
 
 def fetch_tokens():
     """
@@ -82,7 +76,6 @@ def fetch_tokens():
         send_discord_notification(f"❌ {error_message}")
         return []
 
-
 def filter_tokens(tokens):
     """
     Filter tokens based on specific criteria.
@@ -98,6 +91,11 @@ def filter_tokens(tokens):
             holders = token.get("holders", 0)
             links = token.get("links", [])
             has_social_links = any(link.get("type") in ["twitter", "telegram", "discord"] for link in links)
+
+            # Validate token mint
+            if not is_valid_base58(token_address):
+                logging.error(f"Invalid Base58 token mint: {token_address}")
+                continue  # Skip invalid token mints
 
             # Fetch RugCheck report
             rugcheck_report = fetch_rugcheck_report(token_address)
@@ -126,7 +124,6 @@ def filter_tokens(tokens):
         send_discord_notification("⚠️ No tokens qualified based on the criteria.")
     return qualified_tokens
 
-
 def send_to_trading_bot(contract_address, token_symbol):
     """
     Send qualified tokens to the trading bot.
@@ -148,7 +145,6 @@ def send_to_trading_bot(contract_address, token_symbol):
         logging.error(error_message)
         send_discord_notification(error_message)
 
-
 def start_fetching_tokens():
     """
     Start fetching tokens in a continuous loop.
@@ -160,7 +156,6 @@ def start_fetching_tokens():
             for token in qualified_tokens:
                 send_to_trading_bot(token["contract_address"], token["symbol"])
         time.sleep(120)  # Wait for 2 minutes before fetching tokens again
-
 
 if __name__ == "__main__":
     # Start the token-fetching loop
