@@ -43,8 +43,12 @@ def fetch_tokens():
         response = requests.get(DEXSCREENER_API_URL, headers=headers)
         if response.status_code == 200:
             data = response.json()
-            logging.info("Tokens fetched successfully from Dexscreener API.")
-            return data.get("tokens", [])
+            if isinstance(data, list):
+                logging.info("Tokens fetched successfully from Dexscreener API.")
+                return data  # Assuming the API returns a list of tokens
+            else:
+                logging.error("Unexpected response format from Dexscreener API.")
+                return []
         else:
             logging.error(f"Error fetching tokens: {response.status_code} - {response.text}")
             return []
