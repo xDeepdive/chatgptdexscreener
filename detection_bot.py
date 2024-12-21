@@ -4,8 +4,8 @@ import time
 from threading import Thread
 
 # API Configuration
-BIRDEYE_API_URL = "https://public-api.birdeye.so/defi/v3/search"
-DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd"  # Replace with your Discord Webhook URL
+BIRDEYE_TOKENLIST_API_URL = "https://public-api.birdeye.so/defi/tokenlist"
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd"
 TRADING_BOT_WEBHOOK = "https://trading-bot-v0nx.onrender.com/trade"
 API_KEY = "f4d2fe2722064dd2a912cab4da66fa1c"
 
@@ -28,27 +28,27 @@ def send_discord_notification(message):
 
 def fetch_tokens():
     """
-    Fetch token data from the BirdEye API.
+    Fetch token data from the BirdEye Token List API.
     """
     try:
         params = {
-            "chain": "solana",
-            "target": "all",
-            "sort_by": "volume_24h_usd",
+            "sort_by": "v24hUSD",
             "sort_type": "desc",
+            "min_liquidity": 100,  # Minimum liquidity in USD
             "offset": 0,
-            "limit": 20,
+            "limit": 50,
         }
         headers = {
             "accept": "application/json",
             "X-API-KEY": API_KEY,
+            "x-chain": "solana",
         }
-        response = requests.get(BIRDEYE_API_URL, params=params, headers=headers)
+        response = requests.get(BIRDEYE_TOKENLIST_API_URL, params=params, headers=headers)
         if response.status_code == 200:
             data = response.json()
             logging.info("Tokens fetched successfully!")
-            send_discord_notification("✅ Tokens fetched successfully from BirdEye!")
-            return data.get("data", {}).get("items", [])
+            send_discord_notification("✅ Tokens fetched successfully from BirdEye Token List API!")
+            return data.get("data", {}).get("tokens", [])
         else:
             logging.error(f"Error fetching tokens: {response.status_code} - {response.text}")
             return []
@@ -63,30 +63,20 @@ def filter_tokens(tokens):
     qualified_tokens = []
     for token in tokens:
         try:
-            result = token.get("result", [{}])[0]
-            name = result.get("name", "Unknown")
-            symbol = result.get("symbol", "Unknown")
-            address = result.get("address", None)
-            volume_24h_usd = result.get("volume_24h_usd", 0)
-            liquidity = result.get("liquidity", 0)
-            unique_wallet_24h = result.get("unique_wallet_24h", 0)
+            address = token.get("address")
+            liquidity = token.get("liquidity", 0)
+            last_trade_unix_time = token.get("lastTradeUnixTime", 0)
 
             # Apply filters
-            if (
-                volume_24h_usd >= 500000 and  # USD volume must be at least 500k
-                liquidity > 100000 and        # Liquidity must be greater than 100k
-                unique_wallet_24h > 200      # Minimum unique wallets in 24h
-            ):
-                logging.info(f"Token qualified: {name} ({symbol}, {address})")
+            if liquidity > 100000:  # Minimum liquidity in USD
+                logging.info(f"Token qualified: {address}")
                 qualified_tokens.append({
-                    "name": name,
-                    "symbol": symbol,
                     "address": address,
-                    "volume_24h_usd": volume_24h_usd,
                     "liquidity": liquidity,
+                    "last_trade_unix_time": last_trade_unix_time,
                 })
             else:
-                logging.info(f"Token did not meet criteria: {name} ({symbol}, {address})")
+                logging.info(f"Token did not meet criteria: {address}")
         except Exception as e:
             logging.error(f"Error processing token: {e}")
 
@@ -101,17 +91,15 @@ def send_to_trading_bot(token):
     """
     payload = {
         "contract_address": token["address"],
-        "symbol": token["symbol"],
-        "name": token["name"],
-        "volume_24h_usd": token["volume_24h_usd"],
         "liquidity": token["liquidity"],
+        "last_trade_unix_time": token["last_trade_unix_time"],
     }
     try:
         response = requests.post(TRADING_BOT_WEBHOOK, json=payload)
         if response.status_code == 200:
-            logging.info(f"✅ Successfully sent {token['name']} ({token['symbol']}) to trading bot!")
+            logging.info(f"✅ Successfully sent token {token['address']} to trading bot!")
         else:
-            logging.error(f"❌ Failed to send {token['name']}: {response.status_code} - {response.text}")
+            logging.error(f"❌ Failed to send token {token['address']}: {response.status_code} - {response.text}")
     except Exception as e:
         logging.error(f"Error sending token to trading bot: {e}")
 
