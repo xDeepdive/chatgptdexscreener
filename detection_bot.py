@@ -1,4 +1,3 @@
-import os
 import requests
 import time
 import logging
@@ -6,13 +5,13 @@ from discord_webhook import DiscordWebhook, DiscordEmbed
 
 # Constants
 DEXSCREENER_API_URL = "https://api.dexscreener.com/latest/dex/search?q=solana"
-DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd")  # Replace with your Discord webhook URL
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd"  # Predefined webhook URL
 POLL_INTERVAL = 60  # Polling interval in seconds
 
 # Criteria for filtering tokens
 TOKEN_CRITERIA = {
     "min_liquidity_sol": 500,  # Minimum liquidity in SOL
-    "chain": "solana",        # Target blockchain
+    "chain": "solana",         # Target blockchain
 }
 
 # Logging configuration
@@ -96,4 +95,24 @@ def send_discord_notification(token):
         logging.error(f"Error sending Discord notification: {e}")
 
 
-def run_detecti
+def run_detection():
+    """
+    Periodically fetch and filter tokens, sending notifications for matches.
+    """
+    logging.info("Starting detection process...")
+    while True:
+        tokens = fetch_tokens()
+        if not tokens:
+            logging.error("No tokens fetched. Skipping this cycle.")
+            time.sleep(POLL_INTERVAL)
+            continue
+
+        filtered_tokens = filter_tokens(tokens)
+        for token in filtered_tokens:
+            send_discord_notification(token)
+        time.sleep(POLL_INTERVAL)
+
+
+if __name__ == "__main__":
+    # Start the detection process
+    run_detection()
