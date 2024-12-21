@@ -49,7 +49,7 @@ def fetch_twitter_score(handle):
     Fetch the Twitter score for a given Twitter handle.
     """
     try:
-        url = f"{TWITTER_SCORE_URL}/{handle}"
+        url = f"https://twitterscore.io//{handle}"
         response = requests.get(url)
         if response.status_code == 200:
             score = response.json().get("score", 0)
@@ -75,23 +75,20 @@ def filter_tokens(tokens):
             days_old = token.get("daysOld", 0)
             holders = token.get("holders", 0)
             links = token.get("links", [])
-            twitter_handle = next((link.get("url").split("/")[-1] for link in links if link.get("type") == "twitter"), None)
             has_social_links = any(link.get("type") in ["twitter", "telegram", "discord"] for link in links)
 
             if not contract_address or not symbol:
                 logging.warning(f"Skipping token with missing fields: {token}")
                 continue
 
-            # Apply additional filters, including Twitter score
-            twitter_score = fetch_twitter_score(twitter_handle) if twitter_handle else 0
+            # Apply additional filters
             if (
+                1 <= days_old <= 400 and  # Days must be between 1 and 400
                 volume_24h >= 1_000_000 and
-                days_old >= 1 and
                 holders <= 5_000 and
-                has_social_links and
-                twitter_score >= 3
+                has_social_links
             ):
-                logging.info(f"Token qualified: {symbol} (Address: {contract_address}, Twitter Score: {twitter_score})")
+                logging.info(f"Token qualified: {symbol} (Address: {contract_address})")
                 qualified_tokens.append({
                     "contract_address": contract_address,
                     "symbol": symbol
@@ -105,6 +102,7 @@ def filter_tokens(tokens):
         logging.warning("No tokens qualified based on the criteria.")
         send_discord_notification("⚠️ No tokens qualified based on the criteria.")
     return qualified_tokens
+
 
 def send_to_trading_bot(contract_address, token_symbol):
     """
