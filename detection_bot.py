@@ -8,6 +8,9 @@ BIRDEYE_API_URL = "https://public-api.birdeye.so/defi/v3/search"
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd"  # Replace with your Discord Webhook URL
 TRADING_BOT_WEBHOOK = "https://trading-bot-v0nx.onrender.com/trade"
 
+# Birdeye API Key
+BIRDEYE_API_KEY = "f4d2fe2722064dd2a912cab4da66fa1c"
+
 # Logging setup
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -30,6 +33,10 @@ def fetch_tokens():
     Fetch token data from the BirdEye API.
     """
     try:
+        headers = {
+            "accept": "application/json",
+            "X-API-KEY": BIRDEYE_API_KEY
+        }
         params = {
             "chain": "solana",
             "target": "all",
@@ -38,7 +45,7 @@ def fetch_tokens():
             "offset": 0,
             "limit": 20,
         }
-        response = requests.get(BIRDEYE_API_URL, params=params)
+        response = requests.get(BIRDEYE_API_URL, headers=headers, params=params)
         if response.status_code == 200:
             data = response.json()
             logging.info("Tokens fetched successfully!")
