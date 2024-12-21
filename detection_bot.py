@@ -5,7 +5,7 @@ from threading import Thread
 
 # API Configuration
 BIRDEYE_API_URL = "https://public-api.birdeye.so/defi/tokenlist"
-DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/your_webhook_url"  # Replace with your Discord Webhook URL
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd"  # Replace with your Discord Webhook URL
 TRADING_BOT_WEBHOOK = "https://trading-bot-v0nx.onrender.com/trade"
 API_KEY = "f4d2fe2722064dd2a912cab4da66fa1c"  # Replace with your API key
 
