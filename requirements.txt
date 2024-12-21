@@ -3,3 +3,4 @@ gunicorn==21.0.0
 requests==2.31.0
 apscheduler==3.9.1
 base58==2.1.1
+discord-webhook==0.16.0
