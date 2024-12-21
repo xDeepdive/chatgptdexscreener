@@ -7,7 +7,7 @@ from discord_webhook import DiscordWebhook, DiscordEmbed
 # Constants
 DEXSCREENER_API_URL = "https://api.dexscreener.com/latest/dex/search?q=solana"
 SOLANA_PRICE_API_URL = "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
-DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd)  # Replace with your Discord webhook URL
+DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd")  # Replace with your Discord webhook URL
 POLL_INTERVAL = 60  # Polling interval in seconds
 
 # Criteria for filtering tokens
