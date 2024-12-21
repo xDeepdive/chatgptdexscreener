@@ -4,32 +4,24 @@ import logging
 from threading import Thread
 
 # Environment Variables
-TRADING_BOT_WEBHOOK = "https://trading-bot-v0nx.onrender.com/trade"  # Replace with the trading bot URL
-DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd"  # Replace with your Discord Webhook URL
+TRADING_BOT_WEBHOOK = "https://trading-bot-v0nx.onrender.com/trade"
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd"
 RUGCHECK_BASE_URL = "https://api.rugcheck.xyz/v1"
-TWITTER_SCORE_URL = "https://twitterscore.io/api/v1/score"  # Replace with the correct Twitter score API URL
+TWITTER_SCORE_URL = "https://twitterscore.io/api/v1/score"
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 def send_discord_notification(message):
-    """
-    Send a message to Discord using a Webhook.
-    """
     try:
         headers = {"Content-Type": "application/json"}
         response = requests.post(DISCORD_WEBHOOK_URL, json={"content": message}, headers=headers)
-        if response.status_code == 204:
-            logging.info(f"Discord notification sent: {message}")
-        else:
+        if response.status_code != 204:
             logging.error(f"Failed to send Discord notification: {response.status_code} - {response.text}")
     except Exception as e:
         logging.error(f"Error sending Discord notification: {e}")
 
 def fetch_tokens():
-    """
-    Fetch token profiles from the DexScreener API endpoint.
-    """
     url = "https://api.dexscreener.com/token-profiles/latest/v1"
     try:
         response = requests.get(url)
@@ -37,40 +29,32 @@ def fetch_tokens():
             logging.info("Tokens fetched successfully!")
             send_discord_notification("✅ Tokens fetched successfully from DexScreener!")
             return response.json()
-        else:
-            logging.error(f"Error fetching tokens: {response.status_code} - {response.text}")
-            return []
+        logging.error(f"Error fetching tokens: {response.status_code} - {response.text}")
+        return []
     except Exception as e:
         logging.error(f"Error during fetch: {e}")
         return []
 
 def fetch_twitter_score(handle):
-    """
-    Fetch the Twitter score for a given Twitter handle.
-    """
     try:
-        url = f"https://twitterscore.io//{handle}"
+        url = f"{TWITTER_SCORE_URL}/{handle}"
         response = requests.get(url)
         if response.status_code == 200:
             score = response.json().get("score", 0)
             logging.info(f"Twitter score for @{handle}: {score}")
             return score
-        else:
-            logging.error(f"Failed to fetch Twitter score: {response.status_code} - {response.text}")
-            return 0
+        logging.error(f"Failed to fetch Twitter score: {response.status_code} - {response.text}")
+        return 0
     except Exception as e:
         logging.error(f"Error fetching Twitter score: {e}")
         return 0
 
 def filter_tokens(tokens):
-    """
-    Filter tokens based on specific criteria.
-    """
     qualified_tokens = []
     for token in tokens:
         try:
-            contract_address = token.get("tokenAddress", None)
-            symbol = token.get("description", None)
+            contract_address = token.get("tokenAddress")
+            symbol = token.get("description")
             volume_24h = token.get("volume24h", 0)
             days_old = token.get("daysOld", 0)
             holders = token.get("holders", 0)
@@ -81,18 +65,14 @@ def filter_tokens(tokens):
                 logging.warning(f"Skipping token with missing fields: {token}")
                 continue
 
-            # Apply additional filters
-            if (
-                1 <= days_old <= 400 and  # Days must be between 1 and 400
-                volume_24h >= 1_000_000 and
-                holders <= 5_000 and
-                has_social_links
-            ):
-                logging.info(f"Token qualified: {symbol} (Address: {contract_address})")
-                qualified_tokens.append({
-                    "contract_address": contract_address,
-                    "symbol": symbol
-                })
+            if 1 <= days_old <= 400 and volume_24h >= 1_000_000 and holders <= 5_000 and has_social_links:
+                twitter_handles = [link.get("handle") for link in links if link.get("type") == "twitter"]
+                if twitter_handles:
+                    score = fetch_twitter_score(twitter_handles[0])
+                    if score < 3:  # Example threshold
+                        logging.warning(f"Token {symbol} skipped due to low Twitter score: {score}")
+                        continue
+                qualified_tokens.append({"contract_address": contract_address, "symbol": symbol})
         except KeyError as e:
             logging.error(f"Missing key in token data: {e}")
         except Exception as e:
@@ -103,11 +83,7 @@ def filter_tokens(tokens):
         send_discord_notification("⚠️ No tokens qualified based on the criteria.")
     return qualified_tokens
 
-
 def send_to_trading_bot(contract_address, token_symbol):
-    """
-    Send qualified tokens to the trading bot.
-    """
     payload = {"contract_address": contract_address, "symbol": token_symbol}
     try:
         response = requests.post(TRADING_BOT_WEBHOOK, json=payload)
@@ -119,9 +95,6 @@ def send_to_trading_bot(contract_address, token_symbol):
         logging.error(f"Error sending token to trading bot: {e}")
 
 def start_fetching_tokens():
-    """
-    Start fetching tokens in a continuous loop.
-    """
     while True:
         tokens = fetch_tokens()
         if tokens:
@@ -131,5 +104,4 @@ def start_fetching_tokens():
         time.sleep(120)
 
 if __name__ == "__main__":
-    # Start the token-fetching loop
     Thread(target=start_fetching_tokens).start()
