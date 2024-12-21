@@ -43,23 +43,6 @@ def fetch_rugcheck_report(token_address):
         return None
 
 
-def fetch_twitter_score(handle):
-    """
-    Fetch the Twitter score for a given Twitter handle.
-    """
-    try:
-        url = f"{TWITTER_SCORE_URL}/{handle}"
-        response = requests.get(url)
-        if response.status_code == 200:
-            return response.json().get("score", 0)
-        else:
-            logging.warning(f"Failed to fetch Twitter score: {response.status_code} - {response.text}")
-            return 0
-    except Exception as e:
-        logging.error(f"Error fetching Twitter score: {e}")
-        return 0
-
-
 def fetch_tokens():
     """
     Fetch token profiles from the DexScreener API endpoint.
