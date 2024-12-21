@@ -4,10 +4,9 @@ import time
 from threading import Thread
 
 # API and Webhook Configurations
-BIRDEYE_API_URL = "https://public-api.birdeye.so/defi/tokenlist"
+DEXSCREENER_API_URL = "https://api.dexscreener.com/token-profiles/latest/v1"
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd"  # Replace with actual URL
 TRADING_BOT_WEBHOOK = "https://trading-bot-v0nx.onrender.com/trade"
-API_KEY = "f4d2fe2722064dd2a912cab4da66fa1c"
 
 # Logging Configuration
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -37,16 +36,15 @@ def send_discord_notification(token):
 
 def fetch_tokens():
     """
-    Fetch token data from the BirdEye API.
+    Fetch token data from the Dexscreener API.
     """
     try:
-        params = {"sort_by": "v24hUSD", "sort_type": "desc", "offset": 0, "limit": 50, "min_liquidity": 600000}
-        headers = {"accept": "application/json", "X-API-KEY": API_KEY}
-        response = requests.get(BIRDEYE_API_URL, params=params, headers=headers)
+        headers = {"accept": "application/json"}
+        response = requests.get(DEXSCREENER_API_URL, headers=headers)
         if response.status_code == 200:
             data = response.json()
-            logging.info("Tokens fetched successfully from BirdEye API.")
-            return data.get("data", {}).get("tokens", [])
+            logging.info("Tokens fetched successfully from Dexscreener API.")
+            return data.get("tokens", [])
         else:
             logging.error(f"Error fetching tokens: {response.status_code} - {response.text}")
             return []
@@ -62,22 +60,26 @@ def filter_tokens(tokens):
     qualified_tokens = []
     for token in tokens:
         try:
+            # Extract fields with defaults
             name = token.get("name", "Unknown")
             symbol = token.get("symbol", "Unknown")
             address = token.get("address", None)
-            volume_24h = token.get("v24hUSD", 0)
+            volume_24h = token.get("volumeUSD", 0)  # Assuming 24h volume in USD
             holders = token.get("holders", 0)
-            market_cap = token.get("market_cap", 0)
-            liquidity = token.get("liquidity", 0)
-            socials = token.get("socials", {})
+            market_cap = token.get("marketCapUSD", 0)  # Assuming market cap in USD
+            liquidity = token.get("liquidityUSD", 0)  # Assuming liquidity in USD
+            socials = token.get("socialLinks", {})
 
-            # Apply the criteria
+            # Log actual token data for debugging
+            logging.debug(f"Token data: {token}")
+
+            # Apply criteria
             if (
-                volume_24h >= 1_000_000 and  # Minimum $1M 24h trading volume
-                holders >= 2_000 and         # Minimum 2,000 holders
-                market_cap >= 2_000_000 and  # Minimum $2M market cap
-                liquidity >= 600_000 and     # Minimum $600K liquidity
-                ("telegram" in socials or "twitter" in socials)  # At least one social media link
+                volume_24h >= 1_000_000 and
+                holders >= 2_000 and
+                market_cap >= 2_000_000 and
+                liquidity >= 600_000 and
+                ("telegram" in socials or "twitter" in socials)
             ):
                 logging.info(f"Token qualified: {name} ({symbol}, {address})")
                 qualified_tokens.append({
