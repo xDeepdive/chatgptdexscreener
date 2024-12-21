@@ -94,13 +94,6 @@ def filter_tokens(tokens):
                 logging.warning(f"Token failed RugCheck: {symbol} (Address: {contract_address})")
                 continue
 
-            # Fetch Twitter Score if a Twitter handle is available
-            twitter_handle = next((link["url"] for link in links if link.get("type") == "twitter"), None)
-            twitter_score = fetch_twitter_score(twitter_handle) if twitter_handle else 0
-            if twitter_score < 3:  # Minimum Twitter score
-                logging.warning(f"Token {symbol} failed Twitter score check: {twitter_score}")
-                continue
-
             # Apply filters
             if (
                 1 <= days_old <= 400 and  # Days must be between 1 and 400
