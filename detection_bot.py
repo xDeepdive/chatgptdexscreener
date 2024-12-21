@@ -5,13 +5,13 @@ import logging
 from discord_webhook import DiscordWebhook, DiscordEmbed
 
 # Constants
-DEXSCREENER_API_URL = "https://api.dexscreener.com/latest/dex/search?q=solana"  # Replace 'solana' with desired query
-DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd"  # Replace with your Discord webhook URL
+DEXSCREENER_API_URL = "https://api.dexscreener.com/latest/dex/search?q=solana"  # Adjust query if needed
+DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd")  # Replace if not using environment variable
 POLL_INTERVAL = 60  # Polling interval in seconds
 
 # Criteria for filtering tokens
 TOKEN_CRITERIA = {
-    "min_liquidity_usd": 600000,  # Minimum liquidity in USD
+    "min_liquidity_usd": 100000,  # Lower threshold for debugging
     "chain": "solana",  # Target blockchain
 }
 
@@ -44,6 +44,8 @@ def filter_tokens(tokens):
         try:
             liquidity = token.get("liquidity", {}).get("usd", 0)
             chain = token.get("chainId", "").lower()
+            logging.info(f"Token: {token.get('baseToken', {}).get('symbol', 'N/A')}, "
+                         f"Liquidity: {liquidity}, Chain: {chain}")
             if liquidity >= TOKEN_CRITERIA["min_liquidity_usd"] and chain == TOKEN_CRITERIA["chain"]:
                 filtered_tokens.append(token)
         except KeyError as e:
@@ -58,14 +60,18 @@ def send_discord_notification(token):
     Send a Discord notification for a token.
     """
     try:
-        logging.info(f"Sending Discord notification for token: {token['baseToken']['symbol']}")
+        base_token = token.get("baseToken", {})
+        liquidity = token.get("liquidity", {}).get("usd", 0)
+        url = token.get("url", "https://dexscreener.com")
+
+        logging.info(f"Sending Discord notification for token: {base_token.get('symbol', 'N/A')}")
         webhook = DiscordWebhook(url=DISCORD_WEBHOOK_URL)
         embed = DiscordEmbed(
-            title=f"New Token Alert: {token['baseToken']['name']} ({token['baseToken']['symbol']})",
-            description=f"**Symbol**: {token['baseToken']['symbol']}\n"
-                        f"**Liquidity (USD)**: {token['liquidity']['usd']}\n"
-                        f"**Chain**: {token['chainId']}\n"
-                        f"[View on DexScreener]({token['url']})",
+            title=f"New Token Alert: {base_token.get('name', 'N/A')} ({base_token.get('symbol', 'N/A')})",
+            description=f"**Symbol**: {base_token.get('symbol', 'N/A')}\n"
+                        f"**Liquidity (USD)**: {liquidity}\n"
+                        f"**Chain**: {token.get('chainId', 'N/A')}\n"
+                        f"[View on DexScreener]({url})",
             color=0x00ff00,
         )
         webhook.add_embed(embed)
