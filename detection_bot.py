@@ -1,12 +1,12 @@
 import requests
 import time
 import logging
-from threading import Thread
 import base58
+from threading import Thread
 
 # Environment Variables
-TRADING_BOT_WEBHOOK = "https://trading-bot-v0nx.onrender.com/trade"  # Replace with the trading bot URL
-DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/your-webhook-url"  # Replace with your Discord Webhook URL
+TRADING_BOT_WEBHOOK = "https://trading-bot-v0nx.onrender.com/trade"
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/your-webhook-url"
 RUGCHECK_BASE_URL = "https://api.rugcheck.xyz/v1"
 
 # Configure logging
@@ -20,15 +20,16 @@ def is_valid_base58(token_mint):
         return False
 
 def send_discord_notification(message):
+    """
+    Send a message to Discord using a Webhook.
+    """
     try:
-        response = requests.post(DISCORD_WEBHOOK_URL, json={"content": message})
+        headers = {"Content-Type": "application/json"}
+        response = requests.post(DISCORD_WEBHOOK_URL, json={"content": message}, headers=headers)
         if response.status_code == 204:
             logging.info(f"Discord notification sent: {message}")
-        elif response.status_code == 429:
-            retry_after = int(response.headers.get("Retry-After", 5))
-            logging.warning(f"Rate-limited by Discord. Retrying after {retry_after} seconds.")
-            time.sleep(retry_after)
-            send_discord_notification(message)
+        elif response.status_code == 405:
+            logging.error("Failed to send Discord notification: HTTP 405 Method Not Allowed")
         else:
             logging.error(f"Failed to send Discord notification: {response.status_code} - {response.text}")
     except Exception as e:
@@ -38,7 +39,6 @@ def fetch_tokens():
     url = "https://api.dexscreener.com/token-profiles/latest/v1"
     try:
         response = requests.get(url)
-        logging.info(f"Fetching tokens from {url}...")
         if response.status_code == 200:
             logging.info("Tokens fetched successfully!")
             send_discord_notification("✅ Tokens fetched successfully from DexScreener!")
@@ -51,43 +51,26 @@ def fetch_tokens():
         return []
 
 def filter_tokens(tokens):
+    """
+    Filter tokens based on specific criteria.
+    """
     qualified_tokens = []
     for token in tokens:
-        try:
-            chain_id = token.get("chainId", "")
-            description = token.get("description", "")
-            token_address = token.get("tokenAddress", "")
-            volume_24h = token.get("volume24h", 0)
-            days_old = token.get("daysOld", 0)
-            holders = token.get("holders", 0)
-            links = token.get("links", [])
-            has_social_links = any(link.get("type") in ["twitter", "telegram", "discord"] for link in links)
-
-            if not is_valid_base58(token_address):
-                logging.error(f"Invalid Base58 token mint: {token_address}")
-                continue
-
-            if (
-                chain_id == "solana" and
-                volume_24h >= 1_000_000 and
-                days_old >= 1 and
-                holders <= 100_000 and
-                has_social_links
-            ):
-                logging.info(f"Token qualified: {description} (Address: {token_address})")
-                qualified_tokens.append({
-                    "contract_address": token_address,
-                    "symbol": description
-                })
-        except KeyError as e:
-            logging.error(f"Missing key in token data: {e}")
-
+        token_address = token.get("tokenAddress", "")
+        if not is_valid_base58(token_address):
+            logging.error(f"Invalid Base58 token mint: {token_address}")
+            continue
+        # Apply additional filters here
+        qualified_tokens.append(token)
     if not qualified_tokens:
         logging.warning("No tokens qualified based on the criteria.")
         send_discord_notification("⚠️ No tokens qualified based on the criteria.")
     return qualified_tokens
 
 def send_to_trading_bot(contract_address, token_symbol):
+    """
+    Send qualified tokens to the trading bot.
+    """
     payload = {"contract_address": contract_address, "symbol": token_symbol}
     try:
         response = requests.post(TRADING_BOT_WEBHOOK, json=payload)
@@ -99,12 +82,15 @@ def send_to_trading_bot(contract_address, token_symbol):
         logging.error(f"Error sending token to trading bot: {e}")
 
 def start_fetching_tokens():
+    """
+    Start fetching tokens in a continuous loop.
+    """
     while True:
         tokens = fetch_tokens()
         if tokens:
             qualified_tokens = filter_tokens(tokens)
             for token in qualified_tokens:
-                send_to_trading_bot(token["contract_address"], token["symbol"])
+                send_to_trading_bot(token.get("contract_address"), token.get("symbol"))
         time.sleep(120)
 
 if __name__ == "__main__":
