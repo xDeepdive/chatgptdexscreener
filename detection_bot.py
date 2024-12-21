@@ -4,23 +4,30 @@ import time
 from threading import Thread
 
 # API Configuration
-BIRDEYE_TOKENLIST_API_URL = "https://public-api.birdeye.so/defi/tokenlist"
-DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd"
+BIRDEYE_API_URL = "https://public-api.birdeye.so/defi/tokenlist"
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/your_webhook_url"  # Replace with your Discord Webhook URL
 TRADING_BOT_WEBHOOK = "https://trading-bot-v0nx.onrender.com/trade"
-API_KEY = "f4d2fe2722064dd2a912cab4da66fa1c"
+API_KEY = "f4d2fe2722064dd2a912cab4da66fa1c"  # Replace with your API key
 
 # Logging setup
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-def send_discord_notification(message):
+def send_discord_notification(token_details):
     """
-    Send a notification to Discord via a webhook.
+    Send a detailed notification to Discord via a webhook.
     """
     try:
         headers = {"Content-Type": "application/json"}
+        message = (
+            f"**Token Qualified:**\n"
+            f"**Name:** {token_details['name']}\n"
+            f"**Symbol:** {token_details['symbol']}\n"
+            f"**Contract Address:** {token_details['address']}\n"
+            f"**Market Cap:** ${token_details['market_cap']:,}\n"
+        )
         response = requests.post(DISCORD_WEBHOOK_URL, json={"content": message}, headers=headers)
         if response.status_code == 204:
-            logging.info(f"Discord notification sent: {message}")
+            logging.info(f"Discord notification sent: {token_details['name']} ({token_details['symbol']})")
         else:
             logging.error(f"Failed to send Discord notification: {response.status_code} - {response.text}")
     except Exception as e:
@@ -28,26 +35,25 @@ def send_discord_notification(message):
 
 def fetch_tokens():
     """
-    Fetch token data from the BirdEye Token List API.
+    Fetch token data from the BirdEye API.
     """
     try:
         params = {
             "sort_by": "v24hUSD",
             "sort_type": "desc",
-            "min_liquidity": 100,  # Minimum liquidity in USD
             "offset": 0,
             "limit": 50,
+            "min_liquidity": 600000,
         }
         headers = {
             "accept": "application/json",
             "X-API-KEY": API_KEY,
             "x-chain": "solana",
         }
-        response = requests.get(BIRDEYE_TOKENLIST_API_URL, params=params, headers=headers)
+        response = requests.get(BIRDEYE_API_URL, params=params, headers=headers)
         if response.status_code == 200:
             data = response.json()
             logging.info("Tokens fetched successfully!")
-            send_discord_notification("✅ Tokens fetched successfully from BirdEye Token List API!")
             return data.get("data", {}).get("tokens", [])
         else:
             logging.error(f"Error fetching tokens: {response.status_code} - {response.text}")
@@ -63,22 +69,28 @@ def filter_tokens(tokens):
     qualified_tokens = []
     for token in tokens:
         try:
-            address = token.get("address")
-            symbol = token.get("symbol", "Unknown")
             name = token.get("name", "Unknown")
+            symbol = token.get("symbol", "Unknown")
+            address = token.get("address", None)
+            market_cap = token.get("market_cap", 0)
             liquidity = token.get("liquidity", 0)
-            volume_24h_usd = token.get("v24hUSD", 0)
+            socials = token.get("socials", {})
 
             # Apply filters
-            if liquidity > 100000 and volume_24h_usd >= 500000:
+            if (
+                liquidity >= 600000 and  # Minimum liquidity of 600k
+                market_cap > 0 and       # Ensure market cap exists
+                "telegram" in socials or "twitter" in socials  # At least one social presence
+            ):
                 logging.info(f"Token qualified: {name} ({symbol}, {address})")
-                qualified_tokens.append({
-                    "address": address,
-                    "symbol": symbol,
+                qualified_token = {
                     "name": name,
-                    "liquidity": liquidity,
-                    "volume_24h_usd": volume_24h_usd,
-                })
+                    "symbol": symbol,
+                    "address": address,
+                    "market_cap": market_cap,
+                }
+                qualified_tokens.append(qualified_token)
+                send_discord_notification(qualified_token)  # Send Discord notification
             else:
                 logging.info(f"Token did not meet criteria: {name} ({symbol}, {address})")
         except Exception as e:
@@ -86,7 +98,7 @@ def filter_tokens(tokens):
 
     if not qualified_tokens:
         logging.warning("No tokens qualified based on the criteria.")
-        send_discord_notification("⚠️ No tokens qualified based on the criteria.")
+        send_discord_notification({"name": "None", "symbol": "None", "address": "None", "market_cap": 0})
     return qualified_tokens
 
 def send_to_trading_bot(token):
@@ -97,8 +109,7 @@ def send_to_trading_bot(token):
         "contract_address": token["address"],
         "symbol": token["symbol"],
         "name": token["name"],
-        "liquidity": token["liquidity"],
-        "volume_24h_usd": token["volume_24h_usd"],
+        "market_cap": token["market_cap"],
     }
     try:
         response = requests.post(TRADING_BOT_WEBHOOK, json=payload)
