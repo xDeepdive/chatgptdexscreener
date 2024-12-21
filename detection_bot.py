@@ -3,10 +3,10 @@ import logging
 import time
 from threading import Thread
 
-# Configuration
+# API and Webhook Configurations
+DEXSCREENER_SEARCH_URL = "https://api.dexscreener.com/latest/dex/search"
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd"
 TRADING_BOT_WEBHOOK = "https://trading-bot-v0nx.onrender.com/trade"
-DEXSCREENER_API_URL = "https://api.dexscreener.com/latest/dex/tokens/"
 
 # Logging Configuration
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -14,23 +14,23 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 def send_discord_notification(token):
     """
-    Sends a detailed Discord notification for a qualified token.
+    Send a Discord notification with token details.
     """
     try:
         message = (
             f"**Token Qualified!**\n"
             f"**Name**: {token['name']}\n"
             f"**Symbol**: {token['symbol']}\n"
-            f"**Contract Address**: {token['contract_address']}\n"
-            f"**Market Cap**: ${token['market_cap']:,.2f}\n"
-            f"**Chain ID**: {token['chain_id']}\n"
-            f"**Price**: ${token['price_usd']:,.6f}\n"
-            f"**Boosts**: {token['boosts']}\n"
-            f"**Social Links**: {', '.join([link['platform'] for link in token['social_links']])}"
+            f"**Contract Address**: {token['address']}\n"
+            f"**Chain**: {token['chainId']}\n"
+            f"**Market Cap**: ${token['marketCap']:,.2f}\n"
+            f"**Liquidity**: ${token['liquidity']:,.2f}\n"
+            f"**24h Volume**: ${token['volume24h']:,.2f}\n"
         )
-        response = requests.post(DISCORD_WEBHOOK_URL, json={"content": message}, headers={"Content-Type": "application/json"})
+        headers = {"Content-Type": "application/json"}
+        response = requests.post(DISCORD_WEBHOOK_URL, json={"content": message}, headers=headers)
         if response.status_code == 204:
-            logging.info(f"Discord notification sent for {token['name']} ({token['symbol']}).")
+            logging.info(f"Discord notification sent for {token['name']} ({token['symbol']})")
         else:
             logging.error(f"Failed to send Discord notification: {response.status_code} - {response.text}")
     except Exception as e:
@@ -39,16 +39,17 @@ def send_discord_notification(token):
 
 def fetch_tokens():
     """
-    Fetch tokens data from the DexScreener API.
+    Fetch token profiles from the Dexscreener API's search endpoint.
     """
     try:
-        logging.info(f"Fetching tokens from {DEXSCREENER_API_URL}...")
-        response = requests.get(DEXSCREENER_API_URL, timeout=10)
+        logging.info(f"Fetching tokens from {DEXSCREENER_SEARCH_URL}...")
+        response = requests.get(DEXSCREENER_SEARCH_URL, timeout=10)
         if response.status_code == 200:
-            logging.info("Tokens fetched successfully from DexScreener API.")
+            logging.info("Tokens fetched successfully!")
             return response.json().get("pairs", [])
         else:
-            logging.error(f"Error fetching tokens: {response.status_code} - {response.text}")
+            error_message = f"Error fetching tokens: {response.status_code} - {response.text}"
+            logging.error(error_message)
             return []
     except Exception as e:
         logging.error(f"Error during fetch: {e}")
@@ -57,43 +58,45 @@ def fetch_tokens():
 
 def filter_tokens(tokens):
     """
-    Filter tokens based on enhanced criteria.
+    Filter tokens based on specific criteria.
     """
     qualified_tokens = []
     for token in tokens:
         try:
-            chain_id = token.get("chainId", "").lower()
-            market_cap = token.get("marketCap", 0)
-            volume_24h = token.get("volumeUsd", 0)
-            liquidity_usd = token.get("liquidity", {}).get("usd", 0)
-            boosts = token.get("boosts", {}).get("active", 0)
-            social_links = token.get("info", {}).get("socials", [])
-            price_usd = float(token.get("priceUsd", 0))
-            pair_created_at = token.get("pairCreatedAt", 0)
+            # Extract relevant fields
+            base = token.get("baseToken", {})
+            chain_id = token.get("chainId", "")
+            dex_id = token.get("dexId", "")
+            name = base.get("name", "Unknown")
+            symbol = base.get("symbol", "Unknown")
+            address = base.get("address", None)
+            market_cap = token.get("fdv", 0)  # Assuming FDV is close to market cap
+            liquidity = token.get("liquidity", {}).get("usd", 0)
+            volume_24h = token.get("volume", {}).get("usd", 0)
 
-            # Check for at least one valid social link
-            has_social_link = any(social.get("platform") in ["telegram", "twitter", "website"] for social in social_links)
+            # Log actual token data for debugging
+            logging.debug(f"Token data: {token}")
 
-            # Filter criteria
+            # Apply criteria
             if (
-                chain_id in ["ethereum", "bsc", "solana", "polygon"] and
-                market_cap >= 2_000_000 and
+                chain_id and
+                dex_id and
                 volume_24h >= 1_000_000 and
-                liquidity_usd >= 600_000 and
-                has_social_link and
-                price_usd > 0.001 and price_usd < 100 and
-                (boosts > 0 or pair_created_at > (time.time() - 30 * 86400))  # Optional new token logic
+                market_cap >= 2_000_000 and
+                liquidity >= 600_000
             ):
+                logging.info(f"Token qualified: {name} ({symbol}, {address})")
                 qualified_tokens.append({
-                    "name": token.get("baseToken", {}).get("name", "Unknown"),
-                    "symbol": token.get("baseToken", {}).get("symbol", "Unknown"),
-                    "contract_address": token.get("baseToken", {}).get("address", "Unknown"),
-                    "market_cap": market_cap,
-                    "chain_id": chain_id,
-                    "price_usd": price_usd,
-                    "boosts": boosts,
-                    "social_links": social_links,
+                    "name": name,
+                    "symbol": symbol,
+                    "address": address,
+                    "chainId": chain_id,
+                    "marketCap": market_cap,
+                    "liquidity": liquidity,
+                    "volume24h": volume_24h,
                 })
+            else:
+                logging.info(f"Token did not meet criteria: {name} ({symbol}, {address})")
         except Exception as e:
             logging.error(f"Error processing token: {e}")
 
@@ -104,13 +107,15 @@ def filter_tokens(tokens):
 
 def send_to_trading_bot(token):
     """
-    Sends the qualified token to the trading bot.
+    Send qualified tokens to the trading bot.
     """
     payload = {
-        "contract_address": token["contract_address"],
+        "contract_address": token["address"],
         "symbol": token["symbol"],
         "name": token["name"],
-        "market_cap": token["market_cap"],
+        "market_cap": token["marketCap"],
+        "liquidity": token["liquidity"],
+        "volume_24h": token["volume24h"],
     }
     try:
         response = requests.post(TRADING_BOT_WEBHOOK, json=payload, timeout=10)
@@ -127,14 +132,19 @@ def start_fetching_tokens():
     Continuously fetch and process tokens in a background thread.
     """
     while True:
-        tokens = fetch_tokens()
-        if tokens:
-            qualified_tokens = filter_tokens(tokens)
-            for token in qualified_tokens:
-                send_discord_notification(token)
-                send_to_trading_bot(token)
-        time.sleep(300)  # Fetch every 5 minutes
+        try:
+            tokens = fetch_tokens()
+            if tokens:
+                qualified_tokens = filter_tokens(tokens)
+                for token in qualified_tokens:
+                    send_discord_notification(token)
+                    send_to_trading_bot(token)
+        except Exception as e:
+            logging.error(f"Error in token fetching loop: {e}")
+        finally:
+            time.sleep(300)  # Fetch every 5 minutes
 
 
 if __name__ == "__main__":
+    # Start the token fetching process
     Thread(target=start_fetching_tokens).start()
