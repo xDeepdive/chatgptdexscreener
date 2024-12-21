@@ -64,19 +64,23 @@ def filter_tokens(tokens):
     for token in tokens:
         try:
             address = token.get("address")
+            symbol = token.get("symbol", "Unknown")
+            name = token.get("name", "Unknown")
             liquidity = token.get("liquidity", 0)
-            last_trade_unix_time = token.get("lastTradeUnixTime", 0)
+            volume_24h_usd = token.get("v24hUSD", 0)
 
             # Apply filters
-            if liquidity > 100000:  # Minimum liquidity in USD
-                logging.info(f"Token qualified: {address}")
+            if liquidity > 100000 and volume_24h_usd >= 500000:
+                logging.info(f"Token qualified: {name} ({symbol}, {address})")
                 qualified_tokens.append({
                     "address": address,
+                    "symbol": symbol,
+                    "name": name,
                     "liquidity": liquidity,
-                    "last_trade_unix_time": last_trade_unix_time,
+                    "volume_24h_usd": volume_24h_usd,
                 })
             else:
-                logging.info(f"Token did not meet criteria: {address}")
+                logging.info(f"Token did not meet criteria: {name} ({symbol}, {address})")
         except Exception as e:
             logging.error(f"Error processing token: {e}")
 
@@ -91,15 +95,17 @@ def send_to_trading_bot(token):
     """
     payload = {
         "contract_address": token["address"],
+        "symbol": token["symbol"],
+        "name": token["name"],
         "liquidity": token["liquidity"],
-        "last_trade_unix_time": token["last_trade_unix_time"],
+        "volume_24h_usd": token["volume_24h_usd"],
     }
     try:
         response = requests.post(TRADING_BOT_WEBHOOK, json=payload)
         if response.status_code == 200:
-            logging.info(f"✅ Successfully sent token {token['address']} to trading bot!")
+            logging.info(f"✅ Successfully sent {token['name']} ({token['symbol']}) to trading bot!")
         else:
-            logging.error(f"❌ Failed to send token {token['address']}: {response.status_code} - {response.text}")
+            logging.error(f"❌ Failed to send {token['name']}: {response.status_code} - {response.text}")
     except Exception as e:
         logging.error(f"Error sending token to trading bot: {e}")
 
