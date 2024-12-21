@@ -56,12 +56,41 @@ def filter_tokens(tokens):
     """
     qualified_tokens = []
     for token in tokens:
-        token_address = token.get("tokenAddress", "")
-        if not is_valid_base58(token_address):
-            logging.error(f"Invalid Base58 token mint: {token_address}")
-            continue
-        # Apply additional filters here
-        qualified_tokens.append(token)
+        try:
+            contract_address = token.get("tokenAddress", None)
+            symbol = token.get("description", None)
+            volume_24h = token.get("volume24h", 0)
+            days_old = token.get("daysOld", 0)
+            holders = token.get("holders", 0)
+            links = token.get("links", [])
+            has_social_links = any(link.get("type") in ["twitter", "telegram", "discord"] for link in links)
+
+            if not contract_address or not symbol:
+                logging.warning(f"Skipping token with missing fields: {token}")
+                continue
+
+            # Check if the token address is valid Base58
+            if not is_valid_base58(contract_address):
+                logging.error(f"Invalid Base58 token mint: {contract_address}")
+                continue
+
+            # Apply additional filters
+            if (
+                volume_24h >= 1_000_000 and
+                days_old >= 1 and
+                holders <= 100_000 and
+                has_social_links
+            ):
+                logging.info(f"Token qualified: {symbol} (Address: {contract_address})")
+                qualified_tokens.append({
+                    "contract_address": contract_address,
+                    "symbol": symbol
+                })
+        except KeyError as e:
+            logging.error(f"Missing key in token data: {e}")
+        except Exception as e:
+            logging.error(f"Unexpected error: {e}")
+
     if not qualified_tokens:
         logging.warning("No tokens qualified based on the criteria.")
         send_discord_notification("⚠️ No tokens qualified based on the criteria.")
