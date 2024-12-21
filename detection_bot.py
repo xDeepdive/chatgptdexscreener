@@ -10,8 +10,8 @@ POLL_INTERVAL = 60  # Polling interval in seconds
 
 # Criteria for filtering tokens
 TOKEN_CRITERIA = {
-    "min_volume_usd_24h": 2_000_000,  # Minimum 24-hour volume in USD
-    "chain": "solana",                # Target blockchain
+    "min_volume_usd_24h": 100_000,  # Lowered for testing
+    "chain": "solana",              # Target blockchain
 }
 
 # Logging configuration
@@ -28,7 +28,7 @@ def fetch_tokens():
         response.raise_for_status()
         tokens = response.json().get("pairs", [])
         logging.info(f"Fetched {len(tokens)} tokens.")
-        logging.debug(f"Raw Tokens Data: {tokens}")  # Debug log for raw token data
+        logging.debug(f"Raw API Response: {response.json()}")  # Debug log for raw API response
         return tokens
     except Exception as e:
         logging.error(f"Error fetching tokens: {e}")
@@ -109,6 +109,28 @@ def send_discord_notification(token):
         logging.error(f"Error sending Discord notification: {e}")
 
 
+def notify_no_matches():
+    """
+    Notify Discord when no tokens match the criteria.
+    """
+    try:
+        logging.info("Sending Discord notification: No tokens matched the criteria.")
+        webhook = DiscordWebhook(url=DISCORD_WEBHOOK_URL)
+        embed = DiscordEmbed(
+            title="🚫 No Tokens Matched",
+            description="No tokens on the Solana blockchain met the criteria in this cycle.",
+            color=0xff0000,
+        )
+        webhook.add_embed(embed)
+        response = webhook.execute()
+        if response.status_code == 200:
+            logging.info("No match notification sent successfully.")
+        else:
+            logging.warning(f"Failed to send no match notification. Status code: {response.status_code}")
+    except Exception as e:
+        logging.error(f"Error sending no match notification: {e}")
+
+
 def run_detection():
     """
     Periodically fetch and filter tokens, sending notifications for matches.
@@ -122,6 +144,9 @@ def run_detection():
             continue
 
         filtered_tokens = filter_tokens(tokens)
+        if not filtered_tokens:
+            notify_no_matches()
+
         for token in filtered_tokens:
             send_discord_notification(token)
         time.sleep(POLL_INTERVAL)
