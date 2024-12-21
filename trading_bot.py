@@ -20,6 +20,10 @@ def trade():
     try:
         # Extract data from the request
         data = request.json
+        if not data:
+            logging.error("No JSON payload received.")
+            return jsonify({"status": "error", "message": "No data provided"}), 400
+
         contract_address = data.get("contract_address")
         symbol = data.get("symbol")
         name = data.get("name")
@@ -55,11 +59,15 @@ def simulate_trade(contract_address, symbol, name, market_cap):
     Simulate trading logic.
     Replace this with actual API calls to your trading platform.
     """
-    logging.info(f"Simulating trade for {name} ({symbol}).")
-    logging.info(f"Contract Address: {contract_address}")
-    logging.info(f"Market Cap: ${market_cap:,.2f}")
-    # Add trading logic here (e.g., buy/sell based on strategy)
-    logging.info(f"Trade simulated successfully for {symbol}.")
+    try:
+        logging.info(f"Simulating trade for {name} ({symbol}).")
+        logging.info(f"Contract Address: {contract_address}")
+        logging.info(f"Market Cap: ${market_cap:,.2f}")
+        # Add trading logic here (e.g., buy/sell based on strategy)
+        logging.info(f"Trade simulated successfully for {symbol}.")
+    except Exception as e:
+        logging.error(f"Error in simulate_trade: {e}")
+        raise
 
 
 @app.route("/health", methods=["GET"])
@@ -72,5 +80,6 @@ def health_check():
 
 if __name__ == "__main__":
     # Run the Flask app
+    # Render provides the port through an environment variable
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
