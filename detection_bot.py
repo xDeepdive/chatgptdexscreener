@@ -45,9 +45,11 @@ def fetch_tokens():
             data = response.json()
             if isinstance(data, list):
                 logging.info("Tokens fetched successfully from Dexscreener API.")
-                return data  # Assuming the API returns a list of tokens
+                return data  # Assuming the API returns a list
+            elif "data" in data:
+                return data["data"].get("tokens", [])  # Adjust for nested data
             else:
-                logging.error("Unexpected response format from Dexscreener API.")
+                logging.error("Unexpected response format.")
                 return []
         else:
             logging.error(f"Error fetching tokens: {response.status_code} - {response.text}")
