@@ -5,7 +5,7 @@ from threading import Thread
 
 # Environment Variables
 TRADING_BOT_WEBHOOK = "https://trading-bot-v0nx.onrender.com/trade"
-DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/your-webhook-url"
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd"
 RUGCHECK_BASE_URL = "https://api.rugcheck.xyz/v1"
 
 # Configure logging
