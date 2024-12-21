@@ -7,13 +7,14 @@ from discord_webhook import DiscordWebhook, DiscordEmbed
 # Constants
 DEXSCREENER_API_URL = "https://api.dexscreener.com/latest/dex/search?q=solana"
 SOLANA_PRICE_API_URL = "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
-DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd")  # Replace if not using environment variable
+DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd)  # Replace with your Discord webhook URL
 POLL_INTERVAL = 60  # Polling interval in seconds
 
 # Criteria for filtering tokens
 TOKEN_CRITERIA = {
     "min_liquidity_usd": 100000,  # Minimum liquidity in USD
-    "chain": "solana",  # Target blockchain
+    "min_volume_usd_24h": 5000,   # Minimum 24-hour volume in USD
+    "chain": "solana",            # Target blockchain
 }
 
 # Logging configuration
@@ -54,25 +55,35 @@ def fetch_tokens():
 
 def filter_tokens(tokens, solana_price):
     """
-    Filter tokens based on liquidity and chain criteria, converting Solana liquidity to USD.
+    Filter tokens based on liquidity, 24-hour volume, and chain criteria.
     """
     filtered_tokens = []
     for token in tokens:
         try:
             chain = token.get("chainId", "").lower()
-            base_amount = token.get("liquidity", {}).get("base", 0)  # Amount of Solana or base token in the pool
+            base_amount = token.get("liquidity", {}).get("base", 0)  # Amount of Solana in the pool
+            volume_24h = token.get("volumeUsd24h", 0)  # 24-hour volume in USD
 
             # Calculate liquidity in USD
             liquidity_usd = base_amount * solana_price
-            logging.info(f"Token: {token.get('baseToken', {}).get('symbol', 'N/A')}, "
-                         f"Liquidity (SOL): {base_amount}, Liquidity (USD): {liquidity_usd}, Chain: {chain}")
+            logging.info(
+                f"Token: {token.get('baseToken', {}).get('symbol', 'N/A')}, "
+                f"Liquidity (SOL): {base_amount}, Liquidity (USD): {liquidity_usd}, "
+                f"24h Volume (USD): {volume_24h}, Chain: {chain}"
+            )
 
-            # Filter by chain and liquidity criteria
-            if chain == TOKEN_CRITERIA["chain"] and liquidity_usd >= TOKEN_CRITERIA["min_liquidity_usd"]:
+            # Filter by chain, liquidity, and 24-hour volume criteria
+            if (
+                chain == TOKEN_CRITERIA["chain"]
+                and liquidity_usd >= TOKEN_CRITERIA["min_liquidity_usd"]
+                and volume_24h >= TOKEN_CRITERIA["min_volume_usd_24h"]
+            ):
                 filtered_tokens.append(token)
             else:
-                logging.debug(f"Rejected Token: {token.get('baseToken', {}).get('symbol', 'N/A')} - "
-                              f"Liquidity (USD): {liquidity_usd}, Chain: {chain}")
+                logging.debug(
+                    f"Rejected Token: {token.get('baseToken', {}).get('symbol', 'N/A')} - "
+                    f"Liquidity (USD): {liquidity_usd}, 24h Volume (USD): {volume_24h}, Chain: {chain}"
+                )
         except KeyError as e:
             logging.error(f"Key error during token filtering: {e}")
             continue
@@ -87,16 +98,19 @@ def send_discord_notification(token):
     try:
         base_token = token.get("baseToken", {})
         liquidity_usd = token.get("liquidity", {}).get("usd", 0)
+        volume_24h = token.get("volumeUsd24h", 0)
         url = token.get("url", "https://dexscreener.com")
 
         logging.info(f"Sending Discord notification for token: {base_token.get('symbol', 'N/A')}")
         webhook = DiscordWebhook(url=DISCORD_WEBHOOK_URL)
         embed = DiscordEmbed(
-            title=f"New Token Alert: {base_token.get('name', 'N/A')} ({base_token.get('symbol', 'N/A')})",
-            description=f"**Symbol**: {base_token.get('symbol', 'N/A')}\n"
-                        f"**Liquidity (USD)**: {liquidity_usd}\n"
-                        f"**Chain**: {token.get('chainId', 'N/A')}\n"
-                        f"[View on DexScreener]({url})",
+            title=f"🚀 New Token Alert: {base_token.get('name', 'N/A')} ({base_token.get('symbol', 'N/A')})",
+            description=(
+                f"**Liquidity (USD)**: ${liquidity_usd:,.2f}\n"
+                f"**24h Volume (USD)**: ${volume_24h:,.2f}\n"
+                f"**Chain**: {token.get('chainId', 'N/A')}\n"
+                f"[🔗 View on DexScreener]({url})"
+            ),
             color=0x00ff00,
         )
         webhook.add_embed(embed)
@@ -137,3 +151,4 @@ def run_detection():
 if __name__ == "__main__":
     # Start the detection process
     run_detection()
+        
