@@ -97,8 +97,8 @@ def filter_tokens(tokens):
             # Apply filters
             if (
                 1 <= days_old <= 400 and  # Days must be between 1 and 400
-                volume_24h >= 1_000_000 and
-                holders >= 5_000 and  # Minimum holders
+                volume_24h >= 500000 and
+                holders >= 2_000 and  # Minimum holders
                 has_social_links
             ):
                 logging.info(f"Token qualified: {symbol} (Address: {contract_address})")
