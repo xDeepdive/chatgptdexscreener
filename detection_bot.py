@@ -66,7 +66,7 @@ def filter_tokens(tokens):
             if (
                 volume_24h >= 1_000_000 and
                 days_old >= 1 and
-                holders <= 5000 and
+                holders <= 5_000 and
                 has_social_links
             ):
                 logging.info(f"Token qualified: {symbol} (Address: {contract_address})")
