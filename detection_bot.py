@@ -1,7 +1,6 @@
 import requests
 import time
 import logging
-import base58
 from threading import Thread
 
 # Environment Variables
@@ -11,13 +10,6 @@ RUGCHECK_BASE_URL = "https://api.rugcheck.xyz/v1"
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
-def is_valid_base58(token_mint):
-    try:
-        base58.b58decode(token_mint)
-        return True
-    except Exception:
-        return False
 
 def send_discord_notification(message):
     """
@@ -67,11 +59,6 @@ def filter_tokens(tokens):
 
             if not contract_address or not symbol:
                 logging.warning(f"Skipping token with missing fields: {token}")
-                continue
-
-            # Check if the token address is valid Base58
-            if not is_valid_base58(contract_address):
-                logging.error(f"Invalid Base58 token mint: {contract_address}")
                 continue
 
             # Apply additional filters
