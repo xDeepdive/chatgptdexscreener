@@ -59,15 +59,16 @@ def filter_tokens(tokens, solana_price):
     filtered_tokens = []
     for token in tokens:
         try:
-            base_amount = token.get("liquidity", {}).get("base", 0)  # Amount of Solana in the pool
             chain = token.get("chainId", "").lower()
+            base_amount = token.get("liquidity", {}).get("base", 0)  # Amount of Solana or base token in the pool
 
             # Calculate liquidity in USD
             liquidity_usd = base_amount * solana_price
             logging.info(f"Token: {token.get('baseToken', {}).get('symbol', 'N/A')}, "
                          f"Liquidity (SOL): {base_amount}, Liquidity (USD): {liquidity_usd}, Chain: {chain}")
 
-            if liquidity_usd >= TOKEN_CRITERIA["min_liquidity_usd"] and chain == TOKEN_CRITERIA["chain"]:
+            # Filter by chain and liquidity criteria
+            if chain == TOKEN_CRITERIA["chain"] and liquidity_usd >= TOKEN_CRITERIA["min_liquidity_usd"]:
                 filtered_tokens.append(token)
             else:
                 logging.debug(f"Rejected Token: {token.get('baseToken', {}).get('symbol', 'N/A')} - "
@@ -85,7 +86,7 @@ def send_discord_notification(token):
     """
     try:
         base_token = token.get("baseToken", {})
-        liquidity = token.get("liquidity", {}).get("usd", 0)
+        liquidity_usd = token.get("liquidity", {}).get("usd", 0)
         url = token.get("url", "https://dexscreener.com")
 
         logging.info(f"Sending Discord notification for token: {base_token.get('symbol', 'N/A')}")
@@ -93,14 +94,15 @@ def send_discord_notification(token):
         embed = DiscordEmbed(
             title=f"New Token Alert: {base_token.get('name', 'N/A')} ({base_token.get('symbol', 'N/A')})",
             description=f"**Symbol**: {base_token.get('symbol', 'N/A')}\n"
-                        f"**Liquidity (USD)**: {liquidity}\n"
+                        f"**Liquidity (USD)**: {liquidity_usd}\n"
                         f"**Chain**: {token.get('chainId', 'N/A')}\n"
                         f"[View on DexScreener]({url})",
             color=0x00ff00,
         )
         webhook.add_embed(embed)
         response = webhook.execute()
-        if response.status_code == 204:
+
+        if response.status_code == 200:
             logging.info("Notification sent successfully.")
         else:
             logging.warning(f"Failed to send notification. Status code: {response.status_code}")
