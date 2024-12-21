@@ -28,6 +28,7 @@ def fetch_tokens():
         response.raise_for_status()
         tokens = response.json().get("pairs", [])
         logging.info(f"Fetched {len(tokens)} tokens.")
+        logging.debug(f"Raw Tokens Data: {tokens}")  # Debug log for raw token data
         return tokens
     except Exception as e:
         logging.error(f"Error fetching tokens: {e}")
@@ -43,6 +44,14 @@ def filter_tokens(tokens):
         try:
             chain = token.get("chainId", "").lower()
             base_amount = token.get("liquidity", {}).get("base", 0)  # Amount of Solana in the pool
+
+            # Skip tokens with unrealistic liquidity
+            if base_amount > 1_000_000:  # Example threshold
+                logging.warning(
+                    f"Unrealistic liquidity detected for token {token.get('baseToken', {}).get('symbol', 'N/A')} - "
+                    f"Liquidity (SOL): {base_amount}"
+                )
+                continue
 
             logging.info(
                 f"Token: {token.get('baseToken', {}).get('symbol', 'N/A')}, "
@@ -72,6 +81,11 @@ def send_discord_notification(token):
         base_token = token.get("baseToken", {})
         liquidity_sol = token.get("liquidity", {}).get("base", 0)
         url = token.get("url", "https://dexscreener.com")
+
+        # Skip sending notification for unrealistic liquidity
+        if liquidity_sol > 1_000_000:
+            logging.warning(f"Skipping notification for token {base_token.get('symbol', 'N/A')} due to high liquidity.")
+            return
 
         logging.info(f"Sending Discord notification for token: {base_token.get('symbol', 'N/A')}")
         webhook = DiscordWebhook(url=DISCORD_WEBHOOK_URL)
