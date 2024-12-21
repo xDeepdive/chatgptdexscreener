@@ -4,8 +4,8 @@ import logging
 from threading import Thread
 
 # Environment Variables
-TRADING_BOT_WEBHOOK = "https://trading-bot-v0nx.onrender.com/trade"
-DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/your-webhook-url"
+TRADING_BOT_WEBHOOK = "https://trading-bot-v0nx.onrender.com/trade"  # Replace with the trading bot URL
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd"  # Replace with your Discord Webhook URL
 RUGCHECK_BASE_URL = "https://api.rugcheck.xyz/v1"
 
 # Configure logging
@@ -20,14 +20,15 @@ def send_discord_notification(message):
         response = requests.post(DISCORD_WEBHOOK_URL, json={"content": message}, headers=headers)
         if response.status_code == 204:
             logging.info(f"Discord notification sent: {message}")
-        elif response.status_code == 405:
-            logging.error("Failed to send Discord notification: HTTP 405 Method Not Allowed")
         else:
             logging.error(f"Failed to send Discord notification: {response.status_code} - {response.text}")
     except Exception as e:
         logging.error(f"Error sending Discord notification: {e}")
 
 def fetch_tokens():
+    """
+    Fetch token profiles from the DexScreener API endpoint.
+    """
     url = "https://api.dexscreener.com/token-profiles/latest/v1"
     try:
         response = requests.get(url)
@@ -110,4 +111,5 @@ def start_fetching_tokens():
         time.sleep(120)
 
 if __name__ == "__main__":
+    # Start the token-fetching loop
     Thread(target=start_fetching_tokens).start()
