@@ -6,7 +6,7 @@ from discord_webhook import DiscordWebhook, DiscordEmbed
 import logging
 
 # Constants
-DEXSCREENER_API_URL = "https://api.dexscreener.com/latest/dex/tokens"
+DEXSCREENER_API_URL = "https://api.dexscreener.com/latest/dex/pairs"
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd"  # Replace with your Discord webhook URL
 POLL_INTERVAL = 60  # Polling interval in seconds
 
