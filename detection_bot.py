@@ -7,7 +7,6 @@ from threading import Thread
 TRADING_BOT_WEBHOOK = "https://trading-bot-v0nx.onrender.com/trade"
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/your-webhook-url"
 RUGCHECK_BASE_URL = "https://api.rugcheck.xyz/v1"
-TWITTER_SCORE_URL = "https://twitterscore.io/api/v1/score"
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
