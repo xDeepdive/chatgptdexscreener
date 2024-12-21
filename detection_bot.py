@@ -1,19 +1,19 @@
 import requests
-import time
 import logging
+import time
 from threading import Thread
 
-# Environment Variables
+# API Configuration
+BIRDEYE_API_URL = "https://public-api.birdeye.so/defi/v3/search"
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd"  # Replace with your Discord Webhook URL
 TRADING_BOT_WEBHOOK = "https://trading-bot-v0nx.onrender.com/trade"
-DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd"
-RUGCHECK_BASE_URL = "https://api.rugcheck.xyz/v1"
 
-# Configure logging
+# Logging setup
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 def send_discord_notification(message):
     """
-    Send a message to Discord using a Webhook.
+    Send a notification to Discord via a webhook.
     """
     try:
         headers = {"Content-Type": "application/json"}
@@ -25,35 +25,25 @@ def send_discord_notification(message):
     except Exception as e:
         logging.error(f"Error sending Discord notification: {e}")
 
-
-def fetch_rugcheck_report(token_address):
-    """
-    Fetch the RugCheck report for a given Solana token.
-    """
-    try:
-        url = f"{RUGCHECK_BASE_URL}/tokens/{token_address}/report/summary"
-        response = requests.get(url)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            logging.warning(f"Failed to fetch RugCheck report: {response.status_code} - {response.text}")
-            return None
-    except Exception as e:
-        logging.error(f"Error fetching RugCheck report: {e}")
-        return None
-
-
 def fetch_tokens():
     """
-    Fetch token profiles from the DexScreener API endpoint.
+    Fetch token data from the BirdEye API.
     """
-    url = "https://api.dexscreener.com/token-profiles/latest/v1"
     try:
-        response = requests.get(url)
+        params = {
+            "chain": "solana",
+            "target": "all",
+            "sort_by": "volume_24h_usd",
+            "sort_type": "desc",
+            "offset": 0,
+            "limit": 20,
+        }
+        response = requests.get(BIRDEYE_API_URL, params=params)
         if response.status_code == 200:
+            data = response.json()
             logging.info("Tokens fetched successfully!")
-            send_discord_notification("✅ Tokens fetched successfully from DexScreener!")
-            return response.json()
+            send_discord_notification("✅ Tokens fetched successfully from BirdEye!")
+            return data.get("data", {}).get("items", [])
         else:
             logging.error(f"Error fetching tokens: {response.status_code} - {response.text}")
             return []
@@ -61,78 +51,64 @@ def fetch_tokens():
         logging.error(f"Error during fetch: {e}")
         return []
 
-
 def filter_tokens(tokens):
     """
-    Filter tokens for the Solana chain based on specific criteria.
+    Filter tokens based on specific criteria.
     """
     qualified_tokens = []
     for token in tokens:
         try:
-            chain_id = token.get("chainId", "")
-            contract_address = token.get("tokenAddress", None)
-            symbol = token.get("description", "Unknown")
-            volume_24h = token.get("volume24h", 0)
-            days_old = token.get("daysOld", 0)
-            holders = token.get("holders", 0)
-            links = token.get("links", [])
-            has_social_links = any(link.get("type") in ["twitter", "telegram", "discord"] for link in links)
-
-            # Process Solana tokens only
-            if chain_id != "solana":
-                logging.warning(f"Skipping non-Solana token: {chain_id}. Token Details: {token}")
-                continue
-
-            # Skip tokens with missing critical fields
-            if not contract_address or symbol == "Unknown":
-                logging.warning(f"Skipping token due to missing critical fields: {token}")
-                continue
-
-            # Fetch RugCheck report
-            rugcheck = fetch_rugcheck_report(contract_address)
-            if rugcheck and rugcheck.get("status") == "fail":
-                logging.warning(f"Token failed RugCheck: {symbol} (Address: {contract_address}). Token Details: {token}")
-                continue
+            result = token.get("result", [{}])[0]
+            name = result.get("name", "Unknown")
+            symbol = result.get("symbol", "Unknown")
+            address = result.get("address", None)
+            volume_24h_usd = result.get("volume_24h_usd", 0)
+            liquidity = result.get("liquidity", 0)
+            unique_wallet_24h = result.get("unique_wallet_24h", 0)
 
             # Apply filters
             if (
-                1 <= days_old <= 400 and  # Days must be between 1 and 400
-                volume_24h >= 500000 and
-                holders >= 2_000 and  # Minimum holders
-                has_social_links
+                volume_24h_usd >= 500000 and  # USD volume must be at least 500k
+                liquidity > 100000 and        # Liquidity must be greater than 100k
+                unique_wallet_24h > 200      # Minimum unique wallets in 24h
             ):
-                logging.info(f"Token qualified: {symbol} (Address: {contract_address})")
+                logging.info(f"Token qualified: {name} ({symbol}, {address})")
                 qualified_tokens.append({
-                    "contract_address": contract_address,
-                    "symbol": symbol
+                    "name": name,
+                    "symbol": symbol,
+                    "address": address,
+                    "volume_24h_usd": volume_24h_usd,
+                    "liquidity": liquidity,
                 })
             else:
-                logging.info(f"Token did not meet criteria: {symbol} (Address: {contract_address}). Details: {token}")
-        except KeyError as e:
-            logging.error(f"Missing key in token data: {e}. Token Details: {token}")
+                logging.info(f"Token did not meet criteria: {name} ({symbol}, {address})")
         except Exception as e:
-            logging.error(f"Unexpected error: {e}. Token Details: {token}")
+            logging.error(f"Error processing token: {e}")
 
     if not qualified_tokens:
         logging.warning("No tokens qualified based on the criteria.")
         send_discord_notification("⚠️ No tokens qualified based on the criteria.")
     return qualified_tokens
 
-
-def send_to_trading_bot(contract_address, token_symbol):
+def send_to_trading_bot(token):
     """
     Send qualified tokens to the trading bot.
     """
-    payload = {"contract_address": contract_address, "symbol": token_symbol}
+    payload = {
+        "contract_address": token["address"],
+        "symbol": token["symbol"],
+        "name": token["name"],
+        "volume_24h_usd": token["volume_24h_usd"],
+        "liquidity": token["liquidity"],
+    }
     try:
         response = requests.post(TRADING_BOT_WEBHOOK, json=payload)
         if response.status_code == 200:
-            logging.info(f"✅ Successfully sent {token_symbol} ({contract_address}) to trading bot!")
+            logging.info(f"✅ Successfully sent {token['name']} ({token['symbol']}) to trading bot!")
         else:
-            logging.error(f"❌ Failed to send {token_symbol}: {response.status_code} - {response.text}")
+            logging.error(f"❌ Failed to send {token['name']}: {response.status_code} - {response.text}")
     except Exception as e:
         logging.error(f"Error sending token to trading bot: {e}")
-
 
 def start_fetching_tokens():
     """
@@ -143,9 +119,8 @@ def start_fetching_tokens():
         if tokens:
             qualified_tokens = filter_tokens(tokens)
             for token in qualified_tokens:
-                send_to_trading_bot(token.get("contract_address"), token.get("symbol"))
+                send_to_trading_bot(token)
         time.sleep(300)  # Fetch every 5 minutes
-
 
 if __name__ == "__main__":
     # Start the token-fetching loop
