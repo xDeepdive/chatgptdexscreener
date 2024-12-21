@@ -7,6 +7,7 @@ from threading import Thread
 TRADING_BOT_WEBHOOK = "https://trading-bot-v0nx.onrender.com/trade"  # Replace with the trading bot URL
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd"  # Replace with your Discord Webhook URL
 RUGCHECK_BASE_URL = "https://api.rugcheck.xyz/v1"
+TWITTER_SCORE_URL = "https://twitterscore.io/api/v1/score"  # Replace with the correct Twitter score API URL
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -43,6 +44,24 @@ def fetch_tokens():
         logging.error(f"Error during fetch: {e}")
         return []
 
+def fetch_twitter_score(handle):
+    """
+    Fetch the Twitter score for a given Twitter handle.
+    """
+    try:
+        url = f"{TWITTER_SCORE_URL}/{handle}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            score = response.json().get("score", 0)
+            logging.info(f"Twitter score for @{handle}: {score}")
+            return score
+        else:
+            logging.error(f"Failed to fetch Twitter score: {response.status_code} - {response.text}")
+            return 0
+    except Exception as e:
+        logging.error(f"Error fetching Twitter score: {e}")
+        return 0
+
 def filter_tokens(tokens):
     """
     Filter tokens based on specific criteria.
@@ -56,20 +75,23 @@ def filter_tokens(tokens):
             days_old = token.get("daysOld", 0)
             holders = token.get("holders", 0)
             links = token.get("links", [])
+            twitter_handle = next((link.get("url").split("/")[-1] for link in links if link.get("type") == "twitter"), None)
             has_social_links = any(link.get("type") in ["twitter", "telegram", "discord"] for link in links)
 
             if not contract_address or not symbol:
                 logging.warning(f"Skipping token with missing fields: {token}")
                 continue
 
-            # Apply additional filters
+            # Apply additional filters, including Twitter score
+            twitter_score = fetch_twitter_score(twitter_handle) if twitter_handle else 0
             if (
                 volume_24h >= 1_000_000 and
                 days_old >= 1 and
                 holders <= 5_000 and
-                has_social_links
+                has_social_links and
+                twitter_score >= 3
             ):
-                logging.info(f"Token qualified: {symbol} (Address: {contract_address})")
+                logging.info(f"Token qualified: {symbol} (Address: {contract_address}, Twitter Score: {twitter_score})")
                 qualified_tokens.append({
                     "contract_address": contract_address,
                     "symbol": symbol
