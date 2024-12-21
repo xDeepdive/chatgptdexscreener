@@ -4,7 +4,7 @@ import logging
 from discord_webhook import DiscordWebhook, DiscordEmbed
 
 # Constants
-DEXSCREENER_API_URL = "https://api.dexscreener.com/latest/dex/tokens"
+DEXSCREENER_API_URL = "https://api.dexscreener.com/latest/dex/search?q=solana"
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd"  # Predefined webhook URL
 POLL_INTERVAL = 60  # Polling interval in seconds
 
@@ -20,7 +20,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 def fetch_tokens():
     """
-    Fetch the latest token data from DexScreener using the /tokens endpoint.
+    Fetch the latest token data from DexScreener using the /search endpoint for Solana.
     """
     try:
         logging.info("Fetching tokens from DexScreener...")
