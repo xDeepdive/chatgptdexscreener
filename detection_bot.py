@@ -69,6 +69,9 @@ def filter_tokens(tokens, solana_price):
 
             if liquidity_usd >= TOKEN_CRITERIA["min_liquidity_usd"] and chain == TOKEN_CRITERIA["chain"]:
                 filtered_tokens.append(token)
+            else:
+                logging.debug(f"Rejected Token: {token.get('baseToken', {}).get('symbol', 'N/A')} - "
+                              f"Liquidity (USD): {liquidity_usd}, Chain: {chain}")
         except KeyError as e:
             logging.error(f"Key error during token filtering: {e}")
             continue
@@ -118,6 +121,11 @@ def run_detection():
             continue
 
         tokens = fetch_tokens()
+        if not tokens:
+            logging.error("No tokens fetched. Skipping this cycle.")
+            time.sleep(POLL_INTERVAL)
+            continue
+
         filtered_tokens = filter_tokens(tokens, solana_price)
         for token in filtered_tokens:
             send_discord_notification(token)
