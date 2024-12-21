@@ -80,7 +80,7 @@ def filter_tokens(tokens):
 
             # Process Solana tokens only
             if chain_id != "solana":
-                logging.warning(f"Skipping non-Solana token: {chain_id}")
+                logging.warning(f"Skipping non-Solana token: {chain_id}. Token Details: {token}")
                 continue
 
             # Skip tokens with missing critical fields
@@ -91,7 +91,7 @@ def filter_tokens(tokens):
             # Fetch RugCheck report
             rugcheck = fetch_rugcheck_report(contract_address)
             if rugcheck and rugcheck.get("status") == "fail":
-                logging.warning(f"Token failed RugCheck: {symbol} (Address: {contract_address})")
+                logging.warning(f"Token failed RugCheck: {symbol} (Address: {contract_address}). Token Details: {token}")
                 continue
 
             # Apply filters
@@ -106,10 +106,12 @@ def filter_tokens(tokens):
                     "contract_address": contract_address,
                     "symbol": symbol
                 })
+            else:
+                logging.info(f"Token did not meet criteria: {symbol} (Address: {contract_address}). Details: {token}")
         except KeyError as e:
-            logging.error(f"Missing key in token data: {e}")
+            logging.error(f"Missing key in token data: {e}. Token Details: {token}")
         except Exception as e:
-            logging.error(f"Unexpected error: {e}")
+            logging.error(f"Unexpected error: {e}. Token Details: {token}")
 
     if not qualified_tokens:
         logging.warning("No tokens qualified based on the criteria.")
