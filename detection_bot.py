@@ -10,8 +10,8 @@ POLL_INTERVAL = 60  # Polling interval in seconds
 
 # Criteria for filtering tokens
 TOKEN_CRITERIA = {
-    "min_liquidity_sol": 500,  # Minimum liquidity in SOL
-    "chain": "solana",         # Target blockchain
+    "min_volume_usd_24h": 2_000_000,  # Minimum 24-hour volume in USD
+    "chain": "solana",                # Target blockchain
 }
 
 # Logging configuration
@@ -37,34 +37,32 @@ def fetch_tokens():
 
 def filter_tokens(tokens):
     """
-    Filter tokens based on liquidity in SOL and chain criteria.
+    Filter tokens based on 24-hour trading volume and ensure they are on the Solana chain.
     """
     filtered_tokens = []
     for token in tokens:
         try:
             chain = token.get("chainId", "").lower()
-            base_amount = token.get("liquidity", {}).get("base", 0)  # Amount of Solana in the pool
+            volume_24h_usd = token.get("volume", {}).get("usd", 0)  # 24-hour trading volume in USD
 
-            # Skip tokens with unrealistic liquidity
-            if base_amount > 1_000_000:  # Example threshold
-                logging.warning(
-                    f"Unrealistic liquidity detected for token {token.get('baseToken', {}).get('symbol', 'N/A')} - "
-                    f"Liquidity (SOL): {base_amount}"
+            # Skip tokens not on the Solana chain
+            if chain != TOKEN_CRITERIA["chain"]:
+                logging.debug(
+                    f"Rejected Token: {token.get('baseToken', {}).get('symbol', 'N/A')} - Chain mismatch: {chain}"
                 )
                 continue
 
             logging.info(
                 f"Token: {token.get('baseToken', {}).get('symbol', 'N/A')}, "
-                f"Liquidity (SOL): {base_amount}, Chain: {chain}"
+                f"24h Volume (USD): {volume_24h_usd}, Chain: {chain}"
             )
 
-            # Filter by chain and liquidity criteria
-            if chain == TOKEN_CRITERIA["chain"] and base_amount >= TOKEN_CRITERIA["min_liquidity_sol"]:
+            # Filter by 24-hour volume criteria
+            if volume_24h_usd >= TOKEN_CRITERIA["min_volume_usd_24h"]:
                 filtered_tokens.append(token)
             else:
                 logging.debug(
-                    f"Rejected Token: {token.get('baseToken', {}).get('symbol', 'N/A')} - "
-                    f"Liquidity (SOL): {base_amount}, Chain: {chain}"
+                    f"Rejected Token: {token.get('baseToken', {}).get('symbol', 'N/A')} - Low 24h Volume (USD): {volume_24h_usd}"
                 )
         except KeyError as e:
             logging.error(f"Key error during token filtering: {e}")
@@ -79,20 +77,15 @@ def send_discord_notification(token):
     """
     try:
         base_token = token.get("baseToken", {})
-        liquidity_sol = token.get("liquidity", {}).get("base", 0)
+        volume_24h_usd = token.get("volume", {}).get("usd", 0)
         url = token.get("url", "https://dexscreener.com")
-
-        # Skip sending notification for unrealistic liquidity
-        if liquidity_sol > 1_000_000:
-            logging.warning(f"Skipping notification for token {base_token.get('symbol', 'N/A')} due to high liquidity.")
-            return
 
         logging.info(f"Sending Discord notification for token: {base_token.get('symbol', 'N/A')}")
         webhook = DiscordWebhook(url=DISCORD_WEBHOOK_URL)
         embed = DiscordEmbed(
             title=f"🚀 New Token Alert: {base_token.get('name', 'N/A')} ({base_token.get('symbol', 'N/A')})",
             description=(
-                f"**Liquidity (SOL)**: {liquidity_sol:,.2f}\n"
+                f"**24h Volume (USD)**: {volume_24h_usd:,.2f}\n"
                 f"**Chain**: {token.get('chainId', 'N/A')}\n"
                 f"[🔗 View on DexScreener]({url})"
             ),
