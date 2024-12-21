@@ -1,9 +1,8 @@
 import os
 import requests
 import time
-from flask import Flask, jsonify
-from discord_webhook import DiscordWebhook, DiscordEmbed
 import logging
+from discord_webhook import DiscordWebhook, DiscordEmbed
 
 # Constants
 DEXSCREENER_API_URL = "https://api.dexscreener.com/latest/dex/pairs"
@@ -15,9 +14,6 @@ TOKEN_CRITERIA = {
     "min_liquidity_usd": 600000,  # Minimum liquidity in USD
     "chain": "solana",  # Target blockchain
 }
-
-# Flask app initialization
-app = Flask(__name__)
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -95,20 +91,6 @@ def run_detection():
         time.sleep(POLL_INTERVAL)
 
 
-@app.route("/health", methods=["GET"])
-def health_check():
-    """
-    Health check endpoint to verify the bot is running.
-    """
-    return jsonify({"status": "healthy", "message": "Trading bot is operational."}), 200
-
-
 if __name__ == "__main__":
-    # Run the detection process in the background and Flask for health checks
-    from threading import Thread
-    detection_thread = Thread(target=run_detection)
-    detection_thread.daemon = True
-    detection_thread.start()
-
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    # Start the detection process
+    run_detection()
