@@ -1,129 +1,76 @@
-import requests
+import os
+from flask import Flask, request, jsonify
 import logging
-import time
-from threading import Thread
 
-# API and Webhook Configurations
-DEXSCREENER_API_URL = "https://api.dexscreener.com/latest/dex/tokens"
-DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319642099137773619/XWWaswRKfriT6YaYT4SxYeIxBvhDVZAN0o22LVc8gifq5Y4RPK7q70_lUDflqEz3REKd"
+# Flask App Initialization
+app = Flask(__name__)
 
 # Logging Configuration
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-
-def send_discord_notification(token):
-    """
-    Send a Discord notification with token details.
-    """
-    try:
-        message = (
-            f"**Token Qualified!**\n"
-            f"**Name**: {token['name']}\n"
-            f"**Symbol**: {token['symbol']}\n"
-            f"**Contract Address**: {token['address']}\n"
-            f"**Market Cap**: ${token['market_cap']:,.2f}\n"
-            f"**Liquidity**: ${token['liquidity']:,.2f}\n"
-            f"**Price (USD)**: ${token['price_usd']}\n"
-        )
-        headers = {"Content-Type": "application/json"}
-        response = requests.post(DISCORD_WEBHOOK_URL, json={"content": message}, headers=headers)
-        if response.status_code == 204:
-            logging.info(f"Discord notification sent for {token['name']} ({token['symbol']})")
-        else:
-            logging.error(f"Failed to send Discord notification: {response.status_code} - {response.text}")
-    except Exception as e:
-        logging.error(f"Error sending Discord notification: {e}")
+# Sample in-memory store for processing tokens (can be replaced with a database)
+processed_tokens = {}
 
 
-def fetch_tokens():
+@app.route("/trade", methods=["POST"])
+def trade():
     """
-    Fetch token data from the Dexscreener API.
+    Endpoint to receive token details and initiate trading logic.
     """
     try:
-        response = requests.get(DEXSCREENER_API_URL)
-        if response.status_code == 200:
-            data = response.json()
-            logging.info("Tokens fetched successfully from Dexscreener API.")
-            return data.get("pairs", [])
-        else:
-            logging.error(f"Error fetching tokens: {response.status_code} - {response.text}")
-            return []
+        # Extract data from the request
+        data = request.json
+        contract_address = data.get("contract_address")
+        symbol = data.get("symbol")
+        name = data.get("name")
+        market_cap = data.get("market_cap")
+
+        # Validate payload
+        if not contract_address or not symbol or not name or market_cap is None:
+            logging.error("Invalid data received: %s", data)
+            return jsonify({"status": "error", "message": "Invalid data"}), 400
+
+        # Check if the token has already been processed
+        if contract_address in processed_tokens:
+            logging.info(f"Token {symbol} ({contract_address}) already processed.")
+            return jsonify({"status": "skipped", "message": f"Token {symbol} already processed."}), 200
+
+        # Simulate trading logic (this is where your trading strategy goes)
+        logging.info(f"Initiating trade for {symbol} ({contract_address})...")
+        simulate_trade(contract_address, symbol, name, market_cap)
+
+        # Mark the token as processed
+        processed_tokens[contract_address] = True
+
+        # Response back
+        return jsonify({"status": "success", "message": f"Trade executed for {symbol} ({contract_address})"}), 200
+
     except Exception as e:
-        logging.error(f"Error during fetch: {e}")
-        return []
+        logging.error(f"Error processing trade: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
-def filter_tokens(tokens):
+def simulate_trade(contract_address, symbol, name, market_cap):
     """
-    Filter tokens based on old code criteria:
-    - Minimum 24-hour volume: $1,000,000
-    - Minimum holders: 2,000
-    - Minimum market cap: $2,000,000
-    - Minimum liquidity: $600,000
-    - At least one social media link (Twitter or Telegram)
+    Simulate trading logic.
+    Replace this with actual API calls to your trading platform.
     """
-    qualified_tokens = []
-    for token in tokens:
-        try:
-            base_token = token.get("baseToken", {})
-            name = base_token.get("name", "Unknown")
-            symbol = base_token.get("symbol", "Unknown")
-            address = base_token.get("address", None)
-            price_usd = float(token.get("priceUsd", 0))
-            liquidity = token.get("liquidity", {}).get("usd", 0)
-            market_cap = token.get("marketCap", 0)
-            socials = token.get("info", {}).get("socials", [])
-
-            # Check for social media links
-            has_social = any(social.get("platform") in ["twitter", "telegram"] for social in socials)
-
-            # Apply old code criteria
-            if (
-                price_usd > 0 and
-                liquidity >= 600_000 and
-                market_cap >= 2_000_000 and
-                has_social
-            ):
-                logging.info(f"Token qualified: {name} ({symbol}, {address})")
-                qualified_tokens.append({
-                    "name": name,
-                    "symbol": symbol,
-                    "address": address,
-                    "price_usd": price_usd,
-                    "liquidity": liquidity,
-                    "market_cap": market_cap,
-                })
-            else:
-                logging.info(f"Token did not meet criteria: {name} ({symbol}, {address})")
-        except Exception as e:
-            logging.error(f"Error processing token: {e}")
-
-    if not qualified_tokens:
-        logging.warning("No tokens qualified based on the criteria.")
-    return qualified_tokens
+    logging.info(f"Simulating trade for {name} ({symbol}).")
+    logging.info(f"Contract Address: {contract_address}")
+    logging.info(f"Market Cap: ${market_cap:,.2f}")
+    # Add trading logic here (e.g., buy/sell based on strategy)
+    logging.info(f"Trade simulated successfully for {symbol}.")
 
 
-def send_to_trading_bot(contract_address, token_symbol):
+@app.route("/health", methods=["GET"])
+def health_check():
     """
-    Placeholder function to send qualified tokens to the trading bot.
+    Health check endpoint to verify the bot is running.
     """
-    payload = {"contract_address": contract_address, "symbol": token_symbol}
-    logging.info(f"Payload for trading bot: {payload}")
-
-
-def start_fetching_tokens():
-    """
-    Start fetching tokens in a continuous loop.
-    """
-    while True:
-        tokens = fetch_tokens()
-        if tokens:
-            qualified_tokens = filter_tokens(tokens)
-            for token in qualified_tokens:
-                send_discord_notification(token)
-                send_to_trading_bot(token["address"], token["symbol"])
-        time.sleep(300)  # Fetch every 5 minutes
+    return jsonify({"status": "healthy", "message": "Trading bot is operational."}), 200
 
 
 if __name__ == "__main__":
-    Thread(target=start_fetching_tokens).start()
+    # Run the Flask app
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
